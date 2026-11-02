@@ -9,9 +9,18 @@ const router = createRouter({
       component: () => import('@/views/HomeView.vue'),
     },
     {
-      path: '/instance/:id',
-      name: 'instance-detail',
-      component: () => import('@/views/InstanceDetail.vue'),
+      path: '/card/:id',
+      name: 'card-detail',
+      component: () => import('@/views/CardDetail.vue'),
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('@/views/AdminView.vue'),
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/',
     },
   ],
 })

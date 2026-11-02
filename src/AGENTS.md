@@ -6,10 +6,11 @@ This document applies to `/src` only. Keep changes aligned with the current Vue 
 
 - `main.ts` is bootstrap only. It creates the Vue app, installs Pinia and the router, loads global styles, sets `window.$message`, kicks off `setupIconify()`, and mounts `App.vue`. Do not move feature logic into bootstrap.
 - `App.vue` is the app shell. It owns global layout, mounts `<Toaster>` (vue-sonner) and `Provider`, runs startup lifecycle wiring (`initApp()` / `destroyInitManager()` from `@/utils/init`), and `KeepAlive`s `HomeView`.
-- `src/router/index.ts` defines exactly two lazy routes:
-  - `/` → `@/views/HomeView.vue`
-  - `/instance/:id` → `@/views/InstanceDetail.vue`
-- The router has **no guards** today. Do not add one unless there is a real need.
+- `src/router/index.ts` defines lazy routes:
+  - `/` → `@/views/HomeView.vue` (card wall / list)
+  - `/card/:id` → `@/views/CardDetail.vue`
+  - `/admin` → `@/views/AdminView.vue` (first-time setup, login with TOTP, settings panel)
+- The router has **no guards**. Access control is enforced by the backend; the admin view just picks setup / login / settings from the store.
 
 ## Authoring conventions
 
@@ -35,25 +36,26 @@ When you need a new piece of UI:
 
 - Views orchestrate data already exposed by stores and utils.
 - `HomeView.vue` coordinates search, grouping, view-mode selection, scroll restore, and route navigation.
-- `InstanceDetail.vue` coordinates node detail presentation and chart tabs for a selected node.
+- `CardDetail.vue` shows one SIM card: metric cards, info sections and `RenewalHistory`.
+- `AdminView.vue` composes the panels in `src/components/admin/`.
 - Keep `HomeView` named with `defineOptions({ name: 'HomeView' })` so `App.vue`'s `KeepAlive :include="['HomeView']"` keeps working.
-- Heavy node and chart UI must stay lazily loaded with `defineAsyncComponent`, as already done for `NodeCard`, `NodeGeneralCards`, `NodeList`, `LoadChart`, and `PingChart`.
+- Heavy card and chart UI must stay lazily loaded with `defineAsyncComponent`, as already done for `SimCard`, `SummaryCards`, `SimList` and `RenewalHistory`.
 
 ## Stores
 
 - Pinia stores are setup stores and are the source of truth for app state.
-- `@/stores/app` owns public settings, theme-derived config, login state, layout flags, formatting preferences, theme mode, and persisted UI state.
-- `@/stores/nodes` owns normalized node data, group derivation, WebSocket state, and node updates.
+- `@/stores/app` owns site info (`publicSettings`, from `/api/site`), theme-derived config, login state, layout flags, theme mode, and persisted UI state.
+- `@/stores/cards` owns the SIM cards from `/api/cards`, group (card type) derivation and lookups.
 - Components and views should read from stores, not recreate parallel state for the same domain.
-- When behavior depends on `publicSettings.theme_settings`, follow the existing defensive pattern in `@/stores/app`: `typeof` checks, guarded `JSON.parse`, valid-value filtering, and defaults. The settings schema lives in `komari-theme.json` (`configuration.data`).
+- When behavior depends on `publicSettings.theme_settings`, follow the existing defensive pattern in `@/stores/app`: `typeof` checks, valid-value filtering, and defaults. The settings schema lives in `shared/settings-schema.ts`.
 
 ## Utils
 
 - `src/utils` owns transport, formatting, lookups, and startup orchestration.
-- Keep API and RPC access in `@/utils/api` and `@/utils/rpc`.
-- Keep startup, transport selection, polling, reconnects, and WebSocket fallback in `@/utils/init`.
-- Keep formatting in helpers such as `@/utils/helper` and record shaping in `@/utils/recordHelper`.
-- Keep region, OS, and tag lookup logic in their dedicated helper modules (`regionHelper`, `osImageHelper`, `tagHelper`).
+- Keep API access in `@/utils/api` (it adds the CSRF header for writes).
+- Keep startup and the 10-minute refresh in `@/utils/init`; call `refreshData()` after login, logout or sync.
+- Keep SIM computations (days left, validity, balance coverage, month bars, sorting) in `@/utils/cardHelpers`, card type icons in `@/utils/cardTypeHelper`, money in `@/utils/financeHelper`, exchange rates via `@/composables/useExchangeRates`.
+- Keep region and tag lookup logic in their dedicated helper modules (`regionHelper`, `geoHelper`, `tagHelper`).
 - `@/utils/message` is the wrapper exposed as `window.$message`. It calls into `vue-sonner`'s `toast`.
 - Views and components must reuse these helpers instead of duplicating parsing, formatting, lookup, or transport code.
 

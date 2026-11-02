@@ -1,126 +1,41 @@
 # AGENTS.md
 
-Repo guide for `komari-theme-emerald`.
-
-## Snapshot
-
-- Generated: Wed May 27 2026, Asia/Shanghai
-- Branch: `master`
-- App: Vue 3 + Vite + reka-ui + Tailwind CSS v4 theme for Komari Monitor
-- Package manager: `bun` (>= 1.2)
-- Theme manifest: `komari-theme.json`
+Repo guide for `simerald`.
 
 ## What this repo is
 
-- Builds a Komari theme, not a generic web app
-- Release artifact is a zip package Komari can import
-- Runtime app code lives under `src/`
-- Runtime static assets include `public/images/`
-- Release preview image is `docs/preview.png`
+- SIMerald：SIM / eSIM 收藏展示站。数据来自站长的 Notion，界面 fork 自 Komari Emerald 主题
+- Frontend: Vue 3 + Vite + reka-ui + Tailwind CSS v4 (unchanged stack from Emerald), source in `src/`
+- Backend: plain Node (>= 22.18) running TypeScript directly via type stripping, source in `server/`, no build step and no runtime dependencies
+- `shared/` holds types and the settings schema used by both sides
+- Requirements doc: `docs/REQUIREMENTS.md` — read it before changing behaviour
 
 ## Root structure
 
-- `src/` app source
-- `public/images/` runtime image contract, especially flags and logos
-- `.github/` CI workflow and issue templates
-- `docs/preview.png` release preview image
-- `komari-theme.json` theme manifest consumed by the zip build
-- `vite.config.ts` build, chunking, zip packaging
-- `package.json` root commands and pinned dependency versions
-- `bun.lock` resolved lockfile (managed by bun)
+- `src/` frontend (see `src/AGENTS.md`)
+- `server/` backend: HTTP routes (`index.ts`), auth (`auth.ts`), Notion client (`notion.ts`), field mapping (`mapping.ts`), card building (`cards.ts`), public masking (`view.ts`), sync + daily scheduler (`sync.ts`), settings (`settings.ts`), demo data (`demo.ts`)
+- `shared/types.ts` API types; `shared/settings-schema.ts` theme settings schema (drives backend validation and the admin form)
+- `public/assets/flags/` Twemoji flag SVGs, served as `/assets/flags/<ISO>.svg`
+- `deploy/compose.yaml` example deployment; `Dockerfile` builds frontend then runs `node server/index.ts`
 
-## Root commands
+## Commands
 
-Run from repo root only.
+Run from repo root. Package manager is npm (lockfile: `package-lock.json`).
 
 ```bash
-bun run dev
-bun run build
-bun run preview
-bun run lint
+npm run dev:server   # backend on :25780 (demo data without a Notion token)
+npm run dev          # Vite dev server, proxies /api to the backend
+npx eslint .
+npm run type-check   # vue-tsc --build: app + server tsconfigs
+npm run build-only
 ```
 
-Notes:
+There is no test suite. Verify with lint + type-check + build, and by running the backend against demo data.
 
-- `bun run build` runs type check plus production build
-- `bun run lint` runs eslint with `--fix --cache`
-- There is no test suite in this repository
-- Do not invent `bun test` or Vitest commands here
+## Rules that matter
 
-## Build and release contract
-
-`bun run build` must preserve the Komari packaging flow defined in `vite.config.ts`.
-
-Expected output:
-
-- `dist/`
-- `komari-theme-emerald-build-<sha>.zip`
-
-Zip contents:
-
-- `dist/`
-- `komari-theme.json`
-- `preview.png`
-
-Current source of packaged preview:
-
-- `docs/preview.png` on disk
-- renamed to `preview.png` inside the zip
-
-Do not change zip naming, manifest filename, or preview filename without updating the real build contract.
-
-## CI facts
-
-Source of truth: `.github/workflows/build-ci.yml`
-
-CI does only:
-
-1. `bun install --frozen-lockfile`
-2. `bun run build`
-
-CI does not run tests, because there is no test suite.
-
-## Where to look
-
-- Start at `package.json` for root commands
-- Check `vite.config.ts` for build behavior, global constants, and zip packaging
-- Check `komari-theme.json` for theme metadata and managed configuration schema
-- Check `src/` for app behavior
-- Check `public/images/` when code references image filenames directly
-- Check `.github/workflows/build-ci.yml` for CI expectations
-- Check `.github/ISSUE_TEMPLATE/` for issue intake shape
-
-Contributor density, useful for triage:
-
-- `src/components/` is a dense UI change area
-- `src/utils/` is a dense logic and helper area
-- `src/stores/` is central state, usually affected by cross-cutting changes
-
-## Conventions seen in this repo
-
-- Use `bun`, not pnpm/npm/yarn
-- Dependency versions are declared directly in `package.json`; add new ones with `bun add` / `bun add -d`
-- Keep root guidance focused on build, packaging, manifest, and repo structure
-- Preserve the `@` alias to `src` defined in `vite.config.ts`
-- Treat `komari-theme.json` as release input, not optional metadata
-- Treat `docs/preview.png` as release input, not just documentation art
-- Respect existing generated outputs and naming patterns, especially `komari-theme-emerald-build-<sha>.zip`
-- Root verification is lint plus build, not tests
-- UI is built on `reka-ui` + Tailwind CSS v4 (shadcn-vue style under `src/components/ui/`). Do **not** reintroduce Naive UI, UnoCSS, or SCSS — they have been removed.
-
-## Repo grounded anti-patterns
-
-- Do not rename `komari-theme.json`
-- Do not move or rename `docs/preview.png` casually
-- Do not add generic framework advice here that belongs in `src/AGENTS.md`
-- Do not duplicate workflow specifics from `.github/AGENTS.md`
-
-## Child guides
-
-For local rules, defer to the nearest child guide:
-
-- `src/AGENTS.md` for app code, component, store, router, and utility changes
-- `.github/AGENTS.md` for workflow and issue template changes
-- `public/images/AGENTS.md` for runtime image asset naming and compatibility rules
-
-If a child guide exists, it overrides this root file for its subtree.
+- Privacy: anything not explicitly whitelisted in `server/view.ts` must never reach the public `/api/cards` response. Login-only fields: full number, services, account, payment accounts, data check, Notion URL, record titles and accounts
+- Server code must stay erasable-only TypeScript (no enums, no parameter properties, `.ts` extensions in relative imports) because Node strips types at runtime
+- Secrets (Notion token, password hash, TOTP secret) live only in the data directory or env vars, never in the repo
+- State-changing API calls require the `X-SIMerald-Request: 1` header
+- Keep the Emerald look: when changing UI, reuse existing classes and components from `src/components/ui/` rather than inventing new styles

@@ -40,9 +40,8 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 
-# Theme build output
-komari-theme-*.zip
-bun.lock
+# SIMerald 本地运行时的数据目录（站长密码、Notion token 都在里面）
+data/
 .mimocode
 .zcode
 .playwright-mcp

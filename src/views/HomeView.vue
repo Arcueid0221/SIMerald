@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { NodeData } from '@/stores/nodes'
+import type { SimCard } from '@shared/types'
 import { Icon } from '@iconify/vue'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, defineAsyncComponent, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
@@ -13,23 +13,23 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useBackgroundSurface } from '@/composables/useBackgroundSurface'
 import { useAppStore } from '@/stores/app'
-import { useNodesStore } from '@/stores/nodes'
-import { isNodeInGroup, parseNodeGroups } from '@/utils/groupHelper'
+import { useCardsStore } from '@/stores/cards'
+import { sortCards } from '@/utils/cardHelpers'
 import { isRegionMatch } from '@/utils/regionHelper'
 
 defineOptions({ name: 'HomeView' })
 
-const NodeCard = defineAsyncComponent(() => import('@/components/NodeCard.vue'))
-const NodeGeneralCards = defineAsyncComponent(() => import('@/components/NodeGeneralCards.vue'))
-const NodeList = defineAsyncComponent(() => import('@/components/NodeList.vue'))
-const PingChart = defineAsyncComponent(() => import('@/components/PingChart.vue'))
+const SimCardItem = defineAsyncComponent(() => import('@/components/SimCard.vue'))
+const SummaryCards = defineAsyncComponent(() => import('@/components/SummaryCards.vue'))
+const SimList = defineAsyncComponent(() => import('@/components/SimList.vue'))
+const RenewalHistory = defineAsyncComponent(() => import('@/components/RenewalHistory.vue'))
 
 const nodeItemStaggerMs = 35
 const nodeItemStaggerLimit = 12
 
 const appStore = useAppStore()
 const { pickSurfaceClass } = useBackgroundSurface()
-const nodesStore = useNodesStore()
+const cardsStore = useCardsStore()
 const router = useRouter()
 
 onActivated(() => {
@@ -46,7 +46,7 @@ onDeactivated(() => {
 
 const searchText = ref('')
 const debouncedSearchText = ref('')
-const selectedPingNodeUuid = ref<string | null>(null)
+const selectedHistoryCardId = ref<string | null>(null)
 
 const updateDebouncedSearch = useDebounceFn((value: string) => {
   debouncedSearchText.value = value
@@ -57,83 +57,79 @@ watch(searchText, (value) => {
 })
 
 const groups = computed(() => [
-  { tab: '全部节点', name: 'all' },
-  ...nodesStore.groups.map(g => ({ tab: g, name: g })),
+  { tab: '全部号码', name: 'all' },
+  ...cardsStore.groups.map(g => ({ tab: g.label, name: g.name })),
 ])
 
 watch(
-  () => nodesStore.groups,
+  () => cardsStore.groups,
   (gs) => {
     const cur = appStore.nodeSelectedGroup
-    if (cur !== 'all' && !gs.includes(cur)) {
+    if (cur !== 'all' && !gs.some(g => g.name === cur)) {
       appStore.nodeSelectedGroup = 'all'
     }
   },
   { immediate: true },
 )
 
-function isNodeMatchSearch(node: typeof nodesStore.nodes[number], search: string): boolean {
+function isCardInGroup(card: SimCard, group: string): boolean {
+  return group === 'all' || (card.type || '未分类') === group
+}
+
+function isCardMatchSearch(card: SimCard, search: string): boolean {
   if (!search.trim())
     return true
   const lowerSearch = search.toLowerCase().trim()
-  if (node.name.toLowerCase().includes(lowerSearch))
+  const haystack = [card.name, card.carrier, card.countryName, card.type, card.device ?? '', card.last4, ...card.keepAlive]
+  if (haystack.some(text => text.toLowerCase().includes(lowerSearch)))
     return true
-  if (node.region && isRegionMatch(node.region, search))
+  if (card.region && isRegionMatch(card.region, search))
     return true
-  if (node.os && node.os.toLowerCase().includes(lowerSearch))
-    return true
-  if (parseNodeGroups(node.group).some(group => group.toLowerCase().includes(lowerSearch)))
-    return true
-  if (node.tags && node.tags.toLowerCase().includes(lowerSearch))
-    return true
-  if (node.remark && node.remark.toLowerCase().includes(lowerSearch))
+  if (card.number && card.number.includes(lowerSearch))
     return true
   return false
 }
 
-const groupNodeList = computed(() => {
-  return nodesStore.nodes.filter(node => isNodeInGroup(node.group, appStore.nodeSelectedGroup))
+const groupCardList = computed(() => {
+  return cardsStore.cards.filter(card => isCardInGroup(card, appStore.nodeSelectedGroup))
 })
 
-const sampledGroupNodeList = computed(() => {
-  return nodesStore.earthNodes.filter(node => isNodeInGroup(node.group, appStore.nodeSelectedGroup))
-})
-
-const nodeList = computed(() => {
-  let filtered = groupNodeList.value
+const cardList = computed(() => {
+  let filtered = groupCardList.value
   if (debouncedSearchText.value.trim()) {
-    filtered = filtered.filter(n => isNodeMatchSearch(n, debouncedSearchText.value))
+    filtered = filtered.filter(card => isCardMatchSearch(card, debouncedSearchText.value))
   }
-  if (!appStore.offlineNodesLast)
-    return filtered
-  // 稳定排序：在线节点在前、离线节点在后，组内保持原有顺序
-  return [...filtered].sort((a, b) => (a.online === b.online ? 0 : a.online ? -1 : 1))
+  const sorted = sortCards(filtered, appStore.defaultSort)
+  if (!appStore.cancelledLast)
+    return sorted
+  // 稳定排序：已注销的号码放到最后，其余保持原有顺序
+  return [...sorted].sort((a, b) => Number(a.status === 'cancelled') - Number(b.status === 'cancelled'))
 })
 
-const selectedPingNode = computed(() => {
-  if (!selectedPingNodeUuid.value)
+const selectedHistoryCard = computed(() => {
+  if (!selectedHistoryCardId.value)
     return null
-  return nodesStore.nodes.find(node => node.uuid === selectedPingNodeUuid.value) ?? null
+  return cardsStore.cardsById.get(selectedHistoryCardId.value) ?? null
 })
 
-const pingDialogOpen = computed({
-  get: () => selectedPingNode.value !== null,
+const historyDialogOpen = computed({
+  get: () => selectedHistoryCard.value !== null,
   set: (open: boolean) => {
     if (!open)
-      selectedPingNodeUuid.value = null
+      selectedHistoryCardId.value = null
   },
 })
 
-function handleNodeClick(node: typeof nodesStore.nodes[number]) {
-  router.push({ name: 'instance-detail', params: { id: node.uuid } })
+function handleCardClick(card: SimCard) {
+  router.push({ name: 'card-detail', params: { id: card.id } })
 }
 
-function handlePingClick(node: NodeData) {
-  selectedPingNodeUuid.value = node.uuid
+function handleHistoryClick(card: SimCard) {
+  selectedHistoryCardId.value = card.id
 }
 
-function getNodeItemTransitionKey(node: typeof nodesStore.nodes[number]): string {
-  return `${appStore.nodeSelectedGroup}-${node.uuid}`
+function getNodeItemTransitionKey(card: SimCard): string {
+  return `${appStore.nodeSelectedGroup}-${card.id}`
 }
 
 function getNodeItemTransitionStyle(index: number): Record<string, string> {
@@ -150,8 +146,19 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
         variant="destructive"
         :class="pickSurfaceClass('border-none bg-red-400/10 rounded-md', 'border-none bg-red-400/10 backdrop-blur-xs rounded-md')"
       >
-        <AlertTitle>RPC 服务错误</AlertTitle>
-        <AlertDescription>连接服务器失败，请检查网络设置或刷新页面后再试。</AlertDescription>
+        <AlertTitle>连接服务器失败</AlertTitle>
+        <AlertDescription>请检查网络设置或刷新页面后再试。</AlertDescription>
+      </Alert>
+    </div>
+
+    <div v-if="cardsStore.demo" class="alert px-4">
+      <Alert :class="pickSurfaceClass('border-none bg-background rounded-md', 'border-none bg-background/60 backdrop-blur-xs rounded-md')">
+        <AlertTitle>当前显示的是演示数据</AlertTitle>
+        <AlertDescription>
+          站长还没有连接 Notion，下面的号码和运营商都是虚构的。<RouterLink v-if="appStore.isLoggedIn" to="/admin" class="text-emerald-600 underline-offset-4 hover:underline">
+            去后台连接 Notion
+          </RouterLink>
+        </AlertDescription>
       </Alert>
     </div>
 
@@ -166,10 +173,10 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
       </Alert>
     </div>
 
-    <NodeGeneralCards
+    <SummaryCards
       v-if="appStore.earthViewMode !== 'hide'"
-      :nodes="groupNodeList"
-      :globe-nodes="sampledGroupNodeList"
+      :cards="groupCardList"
+      :globe-cards="groupCardList"
       :transition-key="appStore.nodeSelectedGroup"
     />
 
@@ -207,7 +214,7 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
               <div class="relative z-1 w-8 h-8">
                 <div class="absolute top-0 right-0 ">
                   <Input
-                    v-model="searchText" placeholder="搜索节点名称、地区、系统"
+                    v-model="searchText" placeholder="搜索运营商、国家、号码后 4 位"
                     class="h-8 w-8 rounded-md border-none shadow-none transition-all placeholder:text-transparent focus:!w-60 focus:!pl-7.5 focus:placeholder:!text-muted-foreground focus:!ring-emerald-500/10"
                     :class="pickSurfaceClass('bg-background hover:!bg-background/95 focus:!bg-background', 'bg-background/50 hover:!bg-background/60 focus:!bg-background/80 backdrop-blur-xs')"
                   />
@@ -221,7 +228,7 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
           </div>
           <TabsContent :key="appStore.nodeSelectedGroup" :value="appStore.nodeSelectedGroup" class="pointer-events-auto">
             <TransitionGroup
-              v-if="nodeList.length !== 0 && appStore.nodeViewMode === 'card'"
+              v-if="cardList.length !== 0 && appStore.nodeViewMode === 'card'"
               :appear="!appStore.disablePageAnimation"
               :css="!appStore.disablePageAnimation"
               name="node-card-switch"
@@ -229,38 +236,38 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
               class="gap-3 grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(300px,1fr))]"
             >
               <div
-                v-for="(node, index) in nodeList"
-                :key="getNodeItemTransitionKey(node)"
+                v-for="(card, index) in cardList"
+                :key="getNodeItemTransitionKey(card)"
                 class="min-w-0"
                 :style="getNodeItemTransitionStyle(index)"
               >
-                <NodeCard :node="node" @click="handleNodeClick(node)" @ping-click="handlePingClick" />
+                <SimCardItem :card="card" @click="handleCardClick(card)" @history-click="handleHistoryClick" />
               </div>
             </TransitionGroup>
-            <NodeList
-              v-else-if="nodeList.length !== 0 && appStore.nodeViewMode === 'list'"
-              :nodes="nodeList"
+            <SimList
+              v-else-if="cardList.length !== 0 && appStore.nodeViewMode === 'list'"
+              :cards="cardList"
               :transition-key="appStore.nodeSelectedGroup"
-              @click="handleNodeClick"
-              @ping-click="handlePingClick"
+              @click="handleCardClick"
+              @history-click="handleHistoryClick"
             />
             <div v-else class="text-muted-foreground text-center py-8">
-              <Empty description="暂无节点" />
+              <Empty :description="debouncedSearchText.trim() ? '没有找到匹配的号码' : '暂无号码'" />
             </div>
           </TabsContent>
         </Tabs>
       </div>
     </div>
 
-    <Dialog v-model:open="pingDialogOpen">
+    <Dialog v-model:open="historyDialogOpen">
       <DialogContent
-        v-if="selectedPingNode"
+        v-if="selectedHistoryCard"
         class="max-w-6xl gap-0 overflow-hidden border-emerald-600/10 p-0 shadow-[0_0_2rem] shadow-emerald-800/10 transition-all"
         :class="pickSurfaceClass('bg-background', 'bg-background/60')"
       >
         <DialogHeader class="flex h-13 flex-row items-center px-4">
           <DialogTitle class="truncate">
-            {{ selectedPingNode.name }} 延迟 / 丢包
+            {{ selectedHistoryCard.name }} 续费记录
           </DialogTitle>
           <div class="absolute inset-0 mx-0 max-w-none overflow-hidden bg-slate-50 dark:bg-slate-900/50 -z-9 zoom-90">
             <div class="absolute top-0 left-1/2 -ml-152 h-100 w-325 dark:mask-[linear-gradient(white,transparent)]">
@@ -291,7 +298,7 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
           </div>
         </DialogHeader>
         <div class="max-h-[calc(90vh-4rem)] overflow-y-auto p-4 pt-0">
-          <PingChart :uuid="selectedPingNode.uuid" />
+          <RenewalHistory :card="selectedHistoryCard" plain />
         </div>
       </DialogContent>
     </Dialog>

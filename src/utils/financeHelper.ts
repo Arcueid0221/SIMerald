@@ -1,4 +1,4 @@
-import type { NodeData } from '@/stores/nodes'
+import type { SimCard } from '@shared/types'
 
 const FINANCE_CURRENCY_CONFIG = {
   AUD: { rate: 0.20941, symbol: 'A$' },
@@ -10,15 +10,16 @@ const FINANCE_CURRENCY_CONFIG = {
   DKK: { rate: 0.95296, symbol: 'kr' },
   EUR: { rate: 0.1275, symbol: '€' },
   GBP: { rate: 0.11027, symbol: '£' },
-  HKD: { rate: 1.1594, symbol: '$' },
+  HKD: { rate: 1.1594, symbol: 'HK$' },
   HUF: { rate: 44.688, symbol: 'Ft' },
   IDR: { rate: 2622.37, symbol: 'Rp' },
   ILS: { rate: 0.43085, symbol: '₪' },
   INR: { rate: 14.0178, symbol: '₹' },
   ISK: { rate: 18.4626, symbol: 'kr' },
-  JPY: { rate: 23.707, symbol: '¥' },
+  JPY: { rate: 23.707, symbol: 'JP¥' },
   KRW: { rate: 224.11, symbol: '₩' },
   KZT: { rate: 64, symbol: '₸' },
+  LKR: { rate: 41.2, symbol: 'Rs' },
   MXN: { rate: 2.5472, symbol: 'Mex$' },
   MYR: { rate: 0.59945, symbol: 'RM' },
   NOK: { rate: 1.4096, symbol: 'kr' },
@@ -70,6 +71,7 @@ export const DISPLAY_FINANCE_CURRENCIES = [
   'KZT',
   'UAH',
   'CHF',
+  'LKR',
 ] as const satisfies readonly CurrencyCode[]
 export type ExchangeRates = Record<CurrencyCode, number>
 export type ExchangeRateSource = 'cache' | 'network' | 'stale-cache' | 'default'
@@ -81,7 +83,7 @@ interface ExchangeRatesCache {
   rates: Partial<Record<CurrencyCode, number>>
 }
 
-const CACHE_KEY = 'komari_finance_exchange_rates_cny_v1'
+const CACHE_KEY = 'simerald_finance_exchange_rates_cny_v1'
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const MONTH_DAYS = 30
 const LONG_TERM_YEARS = 100
@@ -158,11 +160,6 @@ export function getTodayDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`
 }
 
-export function shouldExcludeFreeNodes(): boolean {
-  const value = getLocalStorageItem('fin_exclude_free')
-  return value === null ? true : value === 'true'
-}
-
 export function getStoredFinanceCurrency(): CurrencyCode {
   return normalizeCurrency(getLocalStorageItem('fin_currency') || 'CNY')
 }
@@ -171,62 +168,53 @@ export function setStoredFinanceCurrency(currency: CurrencyCode): void {
   setLocalStorageItem('fin_currency', currency)
 }
 
+/** 计入价值统计的卡：已注销的不算；免费保号的卡价格为 0，本来就不影响结果 */
+function countable(card: SimCard): boolean {
+  return card.status !== 'cancelled'
+}
+
+function cardExpiry(card: SimCard): string | null {
+  return card.nextRenewalAt ?? card.expiresAt
+}
+
 export function calculateTotalRemainingValueCNY(
-  nodes: NodeData[],
+  cards: SimCard[],
   exchangeRates: ExchangeRates,
-  excludeFreeTags = true,
   now = new Date(),
 ): number {
-  return nodes.reduce((sum, node) => {
-    if (excludeFreeTags && node.tags?.includes('白嫖中'))
-      return sum
-
-    return sum + calculateRemainingValueCNY(node, exchangeRates, now)
-  }, 0)
+  return cards.reduce((sum, card) => countable(card) ? sum + calculateRemainingValueCNY(card, exchangeRates, now) : sum, 0)
 }
 
 export function calculateTotalValueCNY(
-  nodes: NodeData[],
+  cards: SimCard[],
   exchangeRates: ExchangeRates,
-  excludeFreeTags = true,
 ): number {
-  return nodes.reduce((sum, node) => {
-    if (excludeFreeTags && node.tags?.includes('白嫖中'))
-      return sum
-
-    return sum + getPriceCNY(node, exchangeRates)
-  }, 0)
+  return cards.reduce((sum, card) => countable(card) ? sum + getPriceCNY(card, exchangeRates) : sum, 0)
 }
 
 export function calculateValueCNY(
-  node: NodeData,
+  card: SimCard,
   exchangeRates: ExchangeRates,
 ): number {
-  return getPriceCNY(node, exchangeRates)
+  return getPriceCNY(card, exchangeRates)
 }
 
 export function calculateTotalMonthlyAverageCostCNY(
-  nodes: NodeData[],
+  cards: SimCard[],
   exchangeRates: ExchangeRates,
-  excludeFreeTags = true,
 ): number {
-  return nodes.reduce((sum, node) => {
-    if (excludeFreeTags && node.tags?.includes('白嫖中'))
-      return sum
-
-    return sum + calculateMonthlyAverageCostCNY(node, exchangeRates)
-  }, 0)
+  return cards.reduce((sum, card) => countable(card) ? sum + calculateMonthlyAverageCostCNY(card, exchangeRates) : sum, 0)
 }
 
 export function calculateMonthlyAverageCostCNY(
-  node: NodeData,
+  card: SimCard,
   exchangeRates: ExchangeRates,
 ): number {
-  const priceCNY = getPriceCNY(node, exchangeRates)
+  const priceCNY = getPriceCNY(card, exchangeRates)
   if (priceCNY <= 0)
     return 0
 
-  const billingCycle = Number(node.billing_cycle)
+  const billingCycle = Number(card.cycleDays)
   if (!Number.isFinite(billingCycle) || billingCycle <= 0)
     return 0
 
@@ -234,18 +222,20 @@ export function calculateMonthlyAverageCostCNY(
 }
 
 export function calculateRemainingValueCNY(
-  node: NodeData,
+  card: SimCard,
   exchangeRates: ExchangeRates,
   now = new Date(),
 ): number {
-  if (!node.expired_at)
+  const expiry = cardExpiry(card)
+  if (!expiry || card.status === 'cancelled')
     return 0
 
-  const priceCNY = getPriceCNY(node, exchangeRates)
+  const priceCNY = getPriceCNY(card, exchangeRates)
   if (priceCNY <= 0)
     return 0
 
-  const expiredAt = new Date(node.expired_at).getTime()
+  // 有效期至当天仍可用，按当天结束计算
+  const expiredAt = new Date(`${expiry}T23:59:59`).getTime()
   if (!Number.isFinite(expiredAt))
     return 0
 
@@ -255,10 +245,10 @@ export function calculateRemainingValueCNY(
   if (diffYears > LONG_TERM_YEARS)
     return priceCNY
 
-  const billingCycle = Number(node.billing_cycle)
+  const billingCycle = Number(card.cycleDays)
   const billingCycleMs = billingCycle * MS_PER_DAY
   if (diffMs > 0 && billingCycleMs > 0)
-    return priceCNY * (diffMs / billingCycleMs)
+    return priceCNY * Math.min(diffMs / billingCycleMs, 1)
 
   return 0
 }
@@ -318,12 +308,12 @@ export async function getDailyExchangeRates(): Promise<{
   }
 }
 
-function getPriceCNY(node: NodeData, exchangeRates: ExchangeRates): number {
-  const price = Number(node.price)
+function getPriceCNY(card: SimCard, exchangeRates: ExchangeRates): number {
+  const price = Number(card.price)
   if (!Number.isFinite(price) || price <= 0)
     return 0
 
-  const currency = normalizeCurrency(node.currency)
+  const currency = normalizeCurrency(card.currency)
   if (currency === 'CNY')
     return price
 

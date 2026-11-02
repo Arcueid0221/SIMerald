@@ -1,4 +1,4 @@
-import type { PublicSettings } from '@/utils/api'
+import type { SiteInfo } from '@shared/types'
 import type { ByteDecimalsConfig } from '@/utils/helper'
 import { usePreferredDark, useStorageAsync } from '@vueuse/core'
 import { defineStore } from 'pinia'
@@ -7,7 +7,7 @@ import { computed, ref, watch } from 'vue'
 export type ThemeMode = 'auto' | 'light' | 'dark'
 type Lang = 'zh-CN' | 'en-US'
 type NodeViewMode = 'card' | 'list'
-type RpcTransportMode = 'websocket' | 'http'
+type SortMode = 'renewal' | 'notion' | 'name' | 'country'
 type EarthViewMode = 'earth' | 'earth-stop' | 'maps' | 'cards' | 'hide'
 
 /** 固定的字节精度配置 */
@@ -33,8 +33,8 @@ const useAppStore = defineStore('app', () => {
   // 使用 VueUse 的 useStorageAsync 实现自动持久化
   const themeMode = useStorageAsync<ThemeMode>('themeMode', 'auto', localStorage)
   const lang = ref<Lang>('zh-CN')
-  const publicSettings = ref<PublicSettings>()
-  const nodeSelectedGroup = useStorageAsync<string>('nodeSelectedGroup', 'all', localStorage)
+  const publicSettings = ref<SiteInfo>()
+  const nodeSelectedGroup = useStorageAsync<string>('cardSelectedGroup', 'all', localStorage)
   const isLoggedIn = ref<boolean>(false)
   const connectionError = ref<boolean>(false)
 
@@ -42,7 +42,7 @@ const useAppStore = defineStore('app', () => {
   const homeScrollPosition = ref<number>(0)
 
   // 使用 null 表示未设置，等待主题配置加载后决定
-  const storedViewMode = useStorageAsync<NodeViewMode | null>('nodeViewMode', null, localStorage)
+  const storedViewMode = useStorageAsync<NodeViewMode | null>('cardViewMode', null, localStorage)
 
   // 计算属性：从主题配置获取默认视图模式
   const defaultViewMode = computed<NodeViewMode>(() => {
@@ -75,17 +75,16 @@ const useAppStore = defineStore('app', () => {
     },
   })
 
-  // 计算属性：从主题配置获取 RPC 连接模式
-  const rpcTransportMode = computed<RpcTransportMode>(() => {
+  // 计算属性：默认排序方式
+  const defaultSort = computed<SortMode>(() => {
     const settings = publicSettings.value?.theme_settings
-    if (settings && typeof settings.rpcTransportMode === 'string') {
-      const mode = settings.rpcTransportMode
-      if (mode === 'websocket' || mode === 'http') {
-        return mode
-      }
-    }
-    return 'websocket'
+    const mode = settings?.defaultSort
+    if (mode === 'renewal' || mode === 'notion' || mode === 'name' || mode === 'country')
+      return mode
+    return 'renewal'
   })
+
+  const sitename = computed<string>(() => publicSettings.value?.sitename || 'SIMerald')
 
   // 字节格式化精度（固定配置）
   const byteDecimals: ByteDecimalsConfig = { ...BYTE_DECIMALS }
@@ -149,31 +148,13 @@ const useAppStore = defineStore('app', () => {
     return false
   })
 
-  // 计算属性：三网延迟显示节点顺序（未配置时返回空数组，保持默认排序）
-  const pingNetworkOrder = computed<string[]>(() => {
+  // 计算属性：已注销后置（默认顺序下已注销的号码排到最后）
+  const cancelledLast = computed<boolean>(() => {
     const settings = publicSettings.value?.theme_settings
-    const raw = settings && typeof settings.pingNetworkOrder === 'string' ? settings.pingNetworkOrder : ''
-    const seen = new Set<string>()
-    const names: string[] = []
-
-    for (const item of raw.split(',')) {
-      const normalized = item.trim()
-      if (!normalized || seen.has(normalized))
-        continue
-      seen.add(normalized)
-      names.push(normalized)
+    if (settings && typeof settings.cancelledLast === 'boolean') {
+      return settings.cancelledLast
     }
-
-    return names
-  })
-
-  // 计算属性：离线节点后置（默认顺序下离线节点排到所有节点最后）
-  const offlineNodesLast = computed<boolean>(() => {
-    const settings = publicSettings.value?.theme_settings
-    if (settings && typeof settings.offlineNodesLast === 'boolean') {
-      return settings.offlineNodesLast
-    }
-    return false
+    return true
   })
 
   // 计算属性：ICP 备案配置
@@ -346,7 +327,8 @@ const useAppStore = defineStore('app', () => {
     nodeSelectedGroup,
     nodeViewMode,
     defaultViewMode,
-    rpcTransportMode,
+    defaultSort,
+    sitename,
     byteDecimals,
     alertEnabled,
     alertTitle,
@@ -356,8 +338,7 @@ const useAppStore = defineStore('app', () => {
     visitorCountryCode,
     hideAdminEntryWhenLoggedOut,
     disablePageAnimation,
-    pingNetworkOrder,
-    offlineNodesLast,
+    cancelledLast,
     icpEnabled,
     icpNumber,
     icpUrl,

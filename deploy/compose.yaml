@@ -1,0 +1,28 @@
+# SIMerald 部署示例。复制到服务器上，按需修改后运行：docker compose up -d
+services:
+  simerald:
+    image: simerald:local
+    build:
+      context: ..
+    container_name: simerald
+    restart: unless-stopped
+    ports:
+      # 只监听本机，再用反向代理或 Cloudflare 隧道对外
+      - '127.0.0.1:25780:25780'
+    volumes:
+      # 数据目录：站长密码哈希、Notion token、设置和同步缓存都在这里，记得备份
+      # 容器内以 uid 1000 运行，宿主机目录需要：chown 1000:1000 <目录>
+      - ./data:/data
+    environment:
+      TZ: Asia/Shanghai
+      # 也可以不在这里写，登录后台后在「Notion 连接」里填
+      # NOTION_TOKEN: ntn_xxx
+      # NOTION_CARDS_DB: <SIM 卡数据库 ID>
+      # NOTION_RECORDS_DB: <消费记录数据库 ID>
+      # NOTION_ACCOUNTS_DB: <扣款账户数据库 ID，可选>
+    mem_limit: 256m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

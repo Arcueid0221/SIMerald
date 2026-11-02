@@ -12,7 +12,7 @@ const appStore = useAppStore()
 
 const isScrolled = inject<ReturnType<typeof ref<boolean>>>('isScrolled', ref(false))
 
-const siteFavicon = ref('/favicon.ico')
+const siteFavicon = ref('/favicon.svg')
 
 const actionButtons = computed(() => {
   const buttons = [
@@ -39,12 +39,12 @@ function handleButtonClick(action: string) {
       appStore.updateThemeMode()
       break
     case 'jumpToSetting':
-      location.href = '/admin'
+      router.push('/admin')
       break
   }
 }
 
-const sitename = computed(() => appStore.publicSettings?.sitename || 'Komari Monitor')
+const sitename = computed(() => appStore.sitename)
 </script>
 
 <template>
