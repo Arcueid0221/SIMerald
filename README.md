@@ -80,6 +80,11 @@ npm run dev          # 前端开发服务器，会把 /api 转发给后端
 
 提交前运行 `npx eslint .`、`npm run type-check` 和 `npm run build-only`。
 
+## 作者
+
+- [BurningSky0306](https://github.com/BurningSky0306)
+- [Claude](https://claude.com/claude-code)（Anthropic）：和作者一起完成需求梳理、设计和开发
+
 ## 致谢
 
 - 界面基于 [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald)（MIT，作者 Tokinx）修改
