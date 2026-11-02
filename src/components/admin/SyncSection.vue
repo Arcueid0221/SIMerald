@@ -107,6 +107,9 @@ async function saveSchedule() {
           <span class="text-sm">{{ fmt(props.status.sync.nextRunAt) }}</span>
         </div>
       </div>
+      <div v-if="!props.status.sync.lastError && props.status.sync.lastWarning" class="rounded-md bg-yellow-400/10 p-3 text-xs leading-relaxed text-yellow-700 dark:text-yellow-300">
+        {{ props.status.sync.lastWarning }}
+      </div>
       <div v-if="props.status.sync.lastError" class="rounded-md bg-red-400/10 p-3 text-xs text-destructive leading-relaxed">
         {{ fmt(props.status.sync.lastFinishedAt) }}：{{ props.status.sync.lastError }}
       </div>

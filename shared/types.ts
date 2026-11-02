@@ -120,6 +120,8 @@ export interface SyncStatus {
   lastFinishedAt: string | null
   lastSuccessAt: string | null
   lastError: string | null
+  /** 同步成功但有部分内容被跳过时的提示 */
+  lastWarning: string | null
   lastReason: string | null
   cardCount: number
   recordCount: number

@@ -1,4 +1,5 @@
 import type { SimCard, SyncStatus } from '../shared/types.ts'
+import type { NotionPage } from './notion.ts'
 import type { SettingsService } from './settings.ts'
 import type { JsonStore } from './storage.ts'
 import { buildCards, collectAccountNames } from './cards.ts'
@@ -74,6 +75,7 @@ export class SyncService {
       lastFinishedAt: null,
       lastSuccessAt: null,
       lastError: null,
+      lastWarning: null,
       lastReason: null,
       cardCount: this.cache?.cards.length ?? 0,
       recordCount: 0,
@@ -159,9 +161,18 @@ export class SyncService {
       const client = new NotionClient(conn.token)
       const cardsSource = await client.resolveDataSource(conn.cardsDb)
       const recordsSource = await client.resolveDataSource(conn.recordsDb)
-      const accountPages = conn.accountsDb
-        ? await client.queryAll(await client.resolveDataSource(conn.accountsDb))
-        : []
+      // 扣款账户只用来显示名称，读不到时跳过，不影响其他数据
+      let accountPages: NotionPage[] = []
+      let warning: string | null = null
+      if (conn.accountsDb) {
+        try {
+          accountPages = await client.queryAll(await client.resolveDataSource(conn.accountsDb))
+        }
+        catch (error) {
+          warning = `扣款账户数据库读取失败，已跳过（扣款账户名称不会显示）：${(error as Error).message}`
+          console.warn(`[sync] ${warning}`)
+        }
+      }
       const cardPages = await client.queryAll(cardsSource)
       const recordPages = await client.queryAll(recordsSource)
 
@@ -172,6 +183,7 @@ export class SyncService {
 
       this.status.lastSuccessAt = syncedAt
       this.status.lastError = null
+      this.status.lastWarning = warning
       this.status.cardCount = cards.length
       this.status.recordCount = recordCount
       console.log(`[sync] 同步完成：${cards.length} 张卡，${recordCount} 条消费记录`)
