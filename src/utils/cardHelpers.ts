@@ -1,8 +1,7 @@
-import type { CardStatus, SimCard } from '@shared/types'
+import type { CardStatus, SimCard, SimRecord } from '@shared/types'
 import type { ExchangeRates } from '@/utils/financeHelper'
 import dayjs from 'dayjs'
 import { CURRENCY_SYMBOLS, normalizeCurrency } from '@/utils/financeHelper'
-import { formatPriceWithCycle } from '@/utils/tagHelper'
 
 /** 和 Emerald 一致的到期阈值：7 天内红色，15 天内黄色 */
 const CRITICAL_DAYS = 7
@@ -12,18 +11,6 @@ const LEADING_ESIM_REGEX = /^eSIM\s*[·•]\s*/i
 
 export type RenewalState = 'overdue' | 'critical' | 'warning' | 'normal' | 'long_term' | 'none'
 export type BarStatus = 'default' | 'success' | 'warning' | 'error' | 'info'
-
-export interface PriceTagItem {
-  text: string
-  highlight?: boolean
-}
-
-export interface MonthBar {
-  key: string
-  className: string
-  tooltip: string
-  active: boolean
-}
 
 function today() {
   return dayjs().startOf('day')
@@ -76,29 +63,111 @@ export function getRenewalTextClass(card: SimCard): string {
   return ''
 }
 
-export function getRenewalBarStatus(card: SimCard): BarStatus {
-  const state = getRenewalState(card)
-  if (state === 'overdue' || state === 'critical')
-    return 'error'
-  if (state === 'warning')
-    return 'warning'
-  if (state === 'none')
-    return 'default'
-  return 'success'
+/** 有效期分档：按「本期还剩几成」算，每张卡只和自己的续费周期比 */
+export type ValidityTone = 'critical' | 'urgent' | 'warning' | 'fair' | 'good' | 'none'
+
+/** 各档的文字颜色；圆环和横条用 currentColor 跟着它走 */
+export const VALIDITY_TONE_TEXT: Record<ValidityTone, string> = {
+  critical: 'text-destructive',
+  urgent: 'text-orange-500',
+  warning: 'text-warning',
+  fair: 'text-lime-500',
+  good: 'text-success',
+  none: 'text-muted-foreground/40',
 }
 
-/** 本期有效期还剩多少（百分比） */
-export function getValidityPercent(card: SimCard): number {
-  const end = card.nextRenewalAt ?? card.expiresAt
+export interface ValidityInfo {
+  /** 距离有效期末还有几天；没有有效期记录或已注销时为 null */
+  left: number | null
+  /** 本期总天数：本期开始日到有效期末 */
+  total: number
+  /** 本期还剩几成，0 ~ 1 */
+  ratio: number
+  tone: ValidityTone
+  /** 剩得不到一半时，天数跟着变色 */
+  hot: boolean
+}
+
+export function getValidity(card: SimCard): ValidityInfo {
+  const end = card.expiresAt ?? card.nextRenewalAt
   if (card.status === 'cancelled' || !end)
-    return 0
+    return { left: null, total: 0, ratio: 0, tone: 'none', hot: false }
   const endDay = dayjs(end).startOf('day')
   const start = card.periodStart
     ? dayjs(card.periodStart).startOf('day')
     : endDay.subtract(card.cycleDays || 365, 'day')
   const total = Math.max(endDay.diff(start, 'day'), 1)
   const left = endDay.diff(today(), 'day')
-  return Math.max(0, Math.min(100, left / total * 100))
+  const ratio = Math.max(0, Math.min(1, left / total))
+  const tone: ValidityTone = ratio <= 0.1
+    ? 'critical'
+    : ratio <= 0.25 ? 'urgent' : ratio <= 0.5 ? 'warning' : ratio <= 0.75 ? 'fair' : 'good'
+  return { left, total, ratio, tone, hot: ratio <= 0.5 }
+}
+
+/** 剩余天数的数字部分（单位「天」由界面补上） */
+export function getValidityDaysText(validity: ValidityInfo): string {
+  if (validity.left === null)
+    return '-'
+  return validity.left < 0 ? `过期 ${-validity.left}` : String(validity.left)
+}
+
+export function getValidityTooltip(card: SimCard, validity: ValidityInfo): string {
+  if (card.status === 'cancelled')
+    return card.cancelledAt ? `${card.cancelledAt} 注销` : '已注销'
+  if (validity.left === null)
+    return '没有有效期记录'
+  const end = card.expiresAt ?? card.nextRenewalAt
+  return `本期 ${validity.total} 天，还剩 ${Math.max(validity.left, 0)} 天 · 至 ${end}`
+}
+
+export function isPurchaseRecord(record: SimRecord): boolean {
+  return record.type.includes('首次') || record.type.includes('开卡')
+}
+
+export interface PurchaseInfo {
+  /** 首次购买那笔的人民币金额 */
+  cny: number | null
+  /** 原币种金额，如 €4.14 */
+  original: string | null
+  date: string | null
+}
+
+export function getPurchase(card: SimCard): PurchaseInfo {
+  const record = card.history
+    .filter(isPurchaseRecord)
+    .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))[0]
+  if (!record)
+    return { cny: null, original: null, date: card.firstPurchaseAt }
+  return {
+    cny: record.amountCNY,
+    original: record.amount === null ? null : formatAmount(record.amount, record.currency),
+    date: record.date ?? card.firstPurchaseAt,
+  }
+}
+
+export interface KeepCostInfo {
+  /** 卡片上的短写法：¥243 / 免费 / 不固定 */
+  short: string
+  /** 带单位的写法：¥243/年 / 免费保号 / 周期不固定 */
+  long: string
+  /** 悬停提示：原币种续费价 + 保号方式 */
+  tooltip: string
+}
+
+/** 每年保号花多少钱（人民币估算）；已注销的卡也照常算，界面上会盖住 */
+export function getKeepCost(card: SimCard, rates: ExchangeRates): KeepCostInfo {
+  const how = card.keepAlive.join('、') || '未记录保号方式'
+  if (card.cycleDays <= 0)
+    return { short: '不固定', long: '周期不固定', tooltip: `周期不固定 · ${how}` }
+  if (card.price <= 0)
+    return { short: '免费', long: '免费保号', tooltip: `每 ${card.cycleDays} 天免费 · ${how}` }
+  const yearly = formatCNY(getPriceCNY(card, rates) / card.cycleDays * 365, 0)
+  return {
+    short: yearly,
+    long: `${yearly}/年`,
+    tooltip: `${formatAmount(card.price, card.currency)} / ${card.cycleDays} 天 · ${how}`,
+  }
 }
 
 export function getRenewalDaysText(card: SimCard): string {
@@ -167,131 +236,12 @@ export function getPriceCNY(card: SimCard, rates: ExchangeRates): number {
   return card.price / (rates[code] || 1)
 }
 
-/** 折合每年的保号成本（人民币） */
-export function getAnnualCostCNY(card: SimCard, rates: ExchangeRates): number {
-  if (card.status === 'cancelled' || card.cycleDays <= 0)
-    return 0
-  return getPriceCNY(card, rates) / card.cycleDays * 365
-}
-
-export function getPriceTags(card: SimCard): PriceTagItem[] {
-  if (card.status === 'cancelled')
-    return [{ text: '已注销' }]
-  const tags: PriceTagItem[] = []
-  if (card.price > 0)
-    tags.push({ text: card.cycleDays > 0 ? formatPriceWithCycle(card.price, card.cycleDays, card.currency) : formatAmount(card.price, card.currency) })
-  else
-    tags.push({ text: '免费保号' })
-  const days = getRenewalDays(card)
-  if (days !== null) {
-    if (days > LONG_TERM_DAYS)
-      tags.push({ text: '长期' })
-    else
-      tags.push({ text: `${days >= 0 ? '+' : ''}${days}天`, highlight: true })
-  }
-  return tags
-}
-
-export function getRenewalTooltip(card: SimCard): string {
-  if (card.status === 'cancelled')
-    return card.cancelledAt ? `${card.cancelledAt} 注销` : '已注销'
-  const date = card.nextRenewalAt ?? card.expiresAt
-  if (!date)
-    return '没有有效期记录'
-  return card.nextRenewalEnd ? `续费窗口 ${date} ~ ${card.nextRenewalEnd}` : `下次续费 ${date}`
-}
-
 export function shortTypeLabel(type: string): string {
   return type.replace(LEADING_ESIM_REGEX, '').trim() || type || '未分类'
 }
 
 export function getNumberDisplay(card: SimCard): string {
   return card.number || card.numberMasked
-}
-
-export function getCardTags(card: SimCard): string[] {
-  const tags: string[] = []
-  if (card.device)
-    tags.push(card.device)
-  if (card.price === 0 && card.status !== 'cancelled')
-    tags.push('免费保号')
-  for (const service of card.services ?? [])
-    tags.push(service)
-  return tags
-}
-
-export function isFreeCard(card: SimCard): boolean {
-  return !card.price || card.price <= 0
-}
-
-/** 过去 12 个月每月有没有花钱 */
-export function getHistoryBars(card: SimCard, months = 12): MonthBar[] {
-  const start = today().startOf('month').subtract(months - 1, 'month')
-  const totals = new Map<string, { cny: number, count: number }>()
-  for (const record of card.history) {
-    if (!record.date)
-      continue
-    const key = dayjs(record.date).format('YYYY-MM')
-    const entry = totals.get(key) ?? { cny: 0, count: 0 }
-    entry.cny += record.amountCNY ?? 0
-    entry.count += 1
-    totals.set(key, entry)
-  }
-  return Array.from({ length: months }, (_, index) => {
-    const month = start.add(index, 'month')
-    const key = month.format('YYYY-MM')
-    const entry = totals.get(key)
-    return {
-      key,
-      active: !!entry,
-      className: entry ? 'bg-emerald-600/90' : 'bg-muted-foreground/15',
-      tooltip: entry ? `${key}\n${entry.count} 笔 · ${formatCNY(entry.cny)}` : `${key}\n无消费`,
-    }
-  })
-}
-
-/** 未来 12 个月里哪些月份要续费 */
-export function getPlanBars(card: SimCard, months = 12): MonthBar[] {
-  const start = today().startOf('month')
-  const end = start.add(months, 'month')
-  const due = new Map<string, string>()
-  const first = card.status === 'cancelled' ? null : card.nextRenewalAt ?? card.expiresAt
-  if (first) {
-    let date = dayjs(first)
-    // 已经过期的卡，把「本月」标成要续费
-    if (date.isBefore(start))
-      date = today()
-    let guard = 0
-    while (date.isBefore(end) && guard++ < 400) {
-      due.set(date.format('YYYY-MM'), date.format('YYYY-MM-DD'))
-      if (card.cycleDays <= 0)
-        break
-      date = date.add(card.cycleDays, 'day')
-    }
-  }
-  const renewalDays = getRenewalDays(card)
-  return Array.from({ length: months }, (_, index) => {
-    const month = start.add(index, 'month')
-    const key = month.format('YYYY-MM')
-    const date = due.get(key)
-    let className = 'bg-muted-foreground/15'
-    if (date) {
-      const isNext = index === 0 || date === (card.nextRenewalAt ?? card.expiresAt)
-      if (isNext && renewalDays !== null && renewalDays < CRITICAL_DAYS)
-        className = 'bg-rose-500/80'
-      else if (isNext && renewalDays !== null && renewalDays < WARNING_DAYS)
-        className = 'bg-yellow-400/80'
-      else
-        className = 'bg-emerald-600/90'
-    }
-    const priceText = card.price > 0 ? formatAmount(card.price, card.currency) : '免费'
-    return {
-      key,
-      active: !!date,
-      className,
-      tooltip: date ? `${date}\n预计 ${priceText}` : `${key}\n无需续费`,
-    }
-  })
 }
 
 export function statusText(status: CardStatus): string {

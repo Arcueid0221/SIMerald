@@ -5,24 +5,22 @@ import { useDebounceFn } from '@vueuse/core'
 import { computed, defineAsyncComponent, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import CardStyleIcon from '@/components/sim-card/CardStyleIcon.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Empty } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useBackgroundSurface } from '@/composables/useBackgroundSurface'
-import { useAppStore } from '@/stores/app'
+import { CARD_STYLES, useAppStore } from '@/stores/app'
 import { useCardsStore } from '@/stores/cards'
 import { sortCards } from '@/utils/cardHelpers'
+import { getContinent } from '@/utils/continentHelper'
 import { isRegionMatch } from '@/utils/regionHelper'
 
 defineOptions({ name: 'HomeView' })
 
 const SimCardItem = defineAsyncComponent(() => import('@/components/SimCard.vue'))
 const SummaryCards = defineAsyncComponent(() => import('@/components/SummaryCards.vue'))
-const SimList = defineAsyncComponent(() => import('@/components/SimList.vue'))
-const RenewalHistory = defineAsyncComponent(() => import('@/components/RenewalHistory.vue'))
 
 const nodeItemStaggerMs = 35
 const nodeItemStaggerLimit = 12
@@ -46,7 +44,6 @@ onDeactivated(() => {
 
 const searchText = ref('')
 const debouncedSearchText = ref('')
-const selectedHistoryCardId = ref<string | null>(null)
 
 const updateDebouncedSearch = useDebounceFn((value: string) => {
   debouncedSearchText.value = value
@@ -73,8 +70,17 @@ watch(
 )
 
 function isCardInGroup(card: SimCard, group: string): boolean {
-  return group === 'all' || (card.type || '未分类') === group
+  return group === 'all' || getContinent(card.region) === group
 }
+
+const CARD_STYLE_LABELS = {
+  namecard: '名片',
+  badge: '徽章',
+  dial: '表盘',
+  bar: '横条',
+} as const
+
+const cardStyleOptions = CARD_STYLES.map(value => ({ value, label: CARD_STYLE_LABELS[value] }))
 
 function isCardMatchSearch(card: SimCard, search: string): boolean {
   if (!search.trim())
@@ -106,30 +112,12 @@ const cardList = computed(() => {
   return [...sorted].sort((a, b) => Number(a.status === 'cancelled') - Number(b.status === 'cancelled'))
 })
 
-const selectedHistoryCard = computed(() => {
-  if (!selectedHistoryCardId.value)
-    return null
-  return cardsStore.cardsById.get(selectedHistoryCardId.value) ?? null
-})
-
-const historyDialogOpen = computed({
-  get: () => selectedHistoryCard.value !== null,
-  set: (open: boolean) => {
-    if (!open)
-      selectedHistoryCardId.value = null
-  },
-})
-
 function handleCardClick(card: SimCard) {
   router.push({ name: 'card-detail', params: { id: card.id } })
 }
 
-function handleHistoryClick(card: SimCard) {
-  selectedHistoryCardId.value = card.id
-}
-
 function getNodeItemTransitionKey(card: SimCard): string {
-  return `${appStore.nodeSelectedGroup}-${card.id}`
+  return `${appStore.nodeSelectedGroup}-${appStore.cardStyle}-${card.id}`
 }
 
 function getNodeItemTransitionStyle(index: number): Record<string, string> {
@@ -195,22 +183,22 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
               </TabsList>
             </div>
             <div class="ml-auto search flex gap-2 items-center pointer-events-auto">
-              <Button
-                variant="outline" size="icon" aria-label="卡片视图"
-                class="h-8 w-8 border-none shadow-none rounded-md"
-                :class="[pickSurfaceClass('bg-background hover:bg-background/95', 'bg-background/50 hover:bg-background/60 backdrop-blur-xs'), appStore.nodeViewMode === 'card' ? '!text-emerald-600 !bg-background' : '']"
-                @click="appStore.nodeViewMode = 'card'"
+              <div
+                class="flex h-8 items-center gap-0.5 rounded-md p-[3px]"
+                :class="pickSurfaceClass('bg-background/60', 'bg-background/50 backdrop-blur-xl')"
+                role="radiogroup" aria-label="卡片样式"
               >
-                <Icon icon="tabler:layout-grid" :width="14" :height="14" />
-              </Button>
-              <Button
-                variant="outline" size="icon" aria-label="列表视图"
-                class="h-8 w-8 border-none shadow-none rounded-md"
-                :class="[pickSurfaceClass('bg-background hover:bg-background/95', 'bg-background/50 hover:bg-background/60 backdrop-blur-xs'), appStore.nodeViewMode === 'list' ? '!text-emerald-600 !bg-background' : '']"
-                @click="appStore.nodeViewMode = 'list'"
-              >
-                <Icon icon="tabler:table" :width="14" :height="14" />
-              </Button>
+                <button
+                  v-for="option in cardStyleOptions" :key="option.value"
+                  type="button" role="radio" :aria-checked="appStore.cardStyle === option.value" :title="`${option.label}样式`"
+                  class="inline-flex h-6.5 items-center gap-1.5 rounded-sm px-2 text-xs font-medium text-foreground/60 transition-colors hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
+                  :class="appStore.cardStyle === option.value && '!text-emerald-600 bg-background dark:bg-input/30'"
+                  @click="appStore.cardStyle = option.value"
+                >
+                  <CardStyleIcon :card-style="option.value" class="size-3.5 shrink-0" />
+                  <span class="hidden sm:inline">{{ option.label }}</span>
+                </button>
+              </div>
               <div class="relative z-1 w-8 h-8">
                 <div class="absolute top-0 right-0 ">
                   <Input
@@ -228,7 +216,7 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
           </div>
           <TabsContent :key="appStore.nodeSelectedGroup" :value="appStore.nodeSelectedGroup" class="pointer-events-auto">
             <TransitionGroup
-              v-if="cardList.length !== 0 && appStore.nodeViewMode === 'card'"
+              v-if="cardList.length !== 0"
               :appear="!appStore.disablePageAnimation"
               :css="!appStore.disablePageAnimation"
               name="node-card-switch"
@@ -241,16 +229,9 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
                 class="min-w-0"
                 :style="getNodeItemTransitionStyle(index)"
               >
-                <SimCardItem :card="card" @click="handleCardClick(card)" @history-click="handleHistoryClick" />
+                <SimCardItem :card="card" :card-style="appStore.cardStyle" @click="handleCardClick(card)" />
               </div>
             </TransitionGroup>
-            <SimList
-              v-else-if="cardList.length !== 0 && appStore.nodeViewMode === 'list'"
-              :cards="cardList"
-              :transition-key="appStore.nodeSelectedGroup"
-              @click="handleCardClick"
-              @history-click="handleHistoryClick"
-            />
             <div v-else class="text-muted-foreground text-center py-8">
               <Empty :description="debouncedSearchText.trim() ? '没有找到匹配的号码' : '暂无号码'" />
             </div>
@@ -258,50 +239,6 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
         </Tabs>
       </div>
     </div>
-
-    <Dialog v-model:open="historyDialogOpen">
-      <DialogContent
-        v-if="selectedHistoryCard"
-        class="max-w-6xl gap-0 overflow-hidden border-emerald-600/10 p-0 shadow-[0_0_2rem] shadow-emerald-800/10 transition-all"
-        :class="pickSurfaceClass('bg-background', 'bg-background/60')"
-      >
-        <DialogHeader class="flex h-13 flex-row items-center px-4">
-          <DialogTitle class="truncate">
-            {{ selectedHistoryCard.name }} 续费记录
-          </DialogTitle>
-          <div class="absolute inset-0 mx-0 max-w-none overflow-hidden bg-slate-50 dark:bg-slate-900/50 -z-9 zoom-90">
-            <div class="absolute top-0 left-1/2 -ml-152 h-100 w-325 dark:mask-[linear-gradient(white,transparent)]">
-              <div
-                class="absolute inset-0 bg-linear-to-r from-emerald-500 to-lime-300 mask-[radial-gradient(farthest-side_at_top,white,transparent)] opacity-40 dark:from-emerald-500/30 dark:to-lime-300/30 dark:opacity-100"
-              >
-                <svg
-                  aria-hidden="true"
-                  class="absolute inset-x-0 inset-y-[-50%] h-[200%] w-full skew-y-[-18deg] fill-black/40 stroke-black/50 mix-blend-overlay dark:fill-white/2.5 dark:stroke-white/5"
-                >
-                  <defs>
-                    <pattern id="_S_1_" width="72" height="56" patternUnits="userSpaceOnUse" x="-12" y="4">
-                      <path d="M.5 56V.5H72" fill="none" />
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" stroke-width="0" fill="url(#_S_1_)" /><svg
-                    x="-12" y="4"
-                    class="overflow-visible"
-                  >
-                    <rect stroke-width="0" width="73" height="57" x="288" y="168" />
-                    <rect stroke-width="0" width="73" height="57" x="144" y="56" />
-                    <rect stroke-width="0" width="73" height="57" x="504" y="168" />
-                    <rect stroke-width="0" width="73" height="57" x="720" y="336" />
-                  </svg>
-                </svg>
-              </div>
-            </div>
-          </div>
-        </DialogHeader>
-        <div class="max-h-[calc(90vh-4rem)] overflow-y-auto p-4 pt-0">
-          <RenewalHistory :card="selectedHistoryCard" plain />
-        </div>
-      </DialogContent>
-    </Dialog>
   </div>
 </template>
 

@@ -1,7 +1,7 @@
 import type { CardsResponse, SimCard } from '@shared/types'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { shortTypeLabel } from '@/utils/cardHelpers'
+import { CONTINENTS, getContinent } from '@/utils/continentHelper'
 
 export interface CardGroup {
   name: string
@@ -17,15 +17,10 @@ const useCardsStore = defineStore('cards', () => {
   const totalCount = computed(() => cards.value.length)
   const activeCount = computed(() => cards.value.filter(c => c.status === 'active').length)
 
-  /** 分组 = 卡片类型，按在 Notion 里第一次出现的顺序 */
+  /** 分组 = 号码所在大洲，按固定顺序，只列出有号码的大洲 */
   const groups = computed<CardGroup[]>(() => {
-    const seen = new Map<string, CardGroup>()
-    for (const card of [...cards.value].sort((a, b) => a.order - b.order)) {
-      const name = card.type || '未分类'
-      if (!seen.has(name))
-        seen.set(name, { name, label: shortTypeLabel(name) })
-    }
-    return Array.from(seen.values())
+    const present = new Set(cards.value.map(card => getContinent(card.region)))
+    return CONTINENTS.filter(name => present.has(name)).map(name => ({ name, label: name }))
   })
 
   const cardsById = computed(() => {
@@ -34,9 +29,6 @@ const useCardsStore = defineStore('cards', () => {
       map.set(card.id, card)
     return map
   })
-
-  /** 单张卡累计花费的最大值，卡片上的「花费」进度条以它为 100% */
-  const maxSpendCNY = computed(() => cards.value.reduce((max, c) => Math.max(max, c.totalSpentCNY ?? 0), 0))
 
   function setCards(response: CardsResponse): void {
     cards.value = response.cards
@@ -58,7 +50,6 @@ const useCardsStore = defineStore('cards', () => {
     activeCount,
     groups,
     cardsById,
-    maxSpendCNY,
     setCards,
     clear,
   }

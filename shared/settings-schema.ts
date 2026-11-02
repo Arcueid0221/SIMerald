@@ -22,7 +22,7 @@ export interface SettingItem {
 export const SETTINGS_SCHEMA: SettingItem[] = [
   { name: '基础设置', type: 'title' },
   { key: 'sitename', name: '站点标题', type: 'string', default: 'SIMerald', help: '显示在页面左上角和浏览器标签上' },
-  { key: 'defaultViewMode', name: '默认视图模式', type: 'select', default: 'card', options: 'card,list', optionLabels: '卡片,列表', help: '访客第一次打开时的显示方式' },
+  { key: 'defaultCardStyle', name: '默认卡片样式', type: 'select', default: 'namecard', options: 'namecard,badge,dial,bar', optionLabels: '名片,徽章,表盘,横条', help: '访客第一次打开时看到的卡片样式；访客可以在首页右上角自己切换，浏览器会记住' },
   { key: 'defaultSort', name: '默认排序', type: 'select', default: 'renewal', options: 'renewal,notion,name,country', optionLabels: '按下次续费日期,按 Notion 顺序,按名称,按国家/地区', help: '卡片墙的默认顺序' },
 
   { name: '公告设置', type: 'title' },

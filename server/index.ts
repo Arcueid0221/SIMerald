@@ -5,6 +5,7 @@ import { createServer } from 'node:http'
 import path from 'node:path'
 import { AuthError, AuthService } from './auth.ts'
 import { loadConfig } from './config.ts'
+import { LogoStore } from './logos.ts'
 import { SettingsService } from './settings.ts'
 import { JsonStore } from './storage.ts'
 import { SyncService } from './sync.ts'
@@ -53,6 +54,7 @@ const store = new JsonStore(config.dataDir)
 const settings = new SettingsService(store, config)
 const auth = new AuthService(store)
 const sync = new SyncService(store, settings)
+const logos = new LogoStore(config.dataDir)
 
 class HttpError extends Error {
   status: number
@@ -204,7 +206,8 @@ const routes: Record<string, Handler> = {
 
   'GET /api/cards': (req, res) => {
     const full = isLoggedIn(req)
-    const { cards, syncedAt, demo } = sync.getCards()
+    const { cards: rawCards, syncedAt, demo } = sync.getCards()
+    const cards = rawCards.map(card => ({ ...card, logo: logos.urlFor(card.carrier) }))
     const body: CardsResponse = { cards: full ? cards : toPublicCards(cards), syncedAt, demo, full }
     sendJson(res, 200, body)
   },
@@ -365,6 +368,11 @@ const server = createServer(async (req, res) => {
     }
     if (method !== 'GET' && method !== 'HEAD')
       throw new HttpError(405, '不支持的请求方法')
+    if (url.pathname.startsWith('/logos/')) {
+      if (!logos.serve(req, res, url.pathname, SECURITY_HEADERS))
+        res.writeHead(404, { ...SECURITY_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' }).end('Not Found')
+      return
+    }
     serveStatic(req, res, url.pathname)
   }
   catch (error) {

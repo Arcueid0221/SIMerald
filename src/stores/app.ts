@@ -6,7 +6,7 @@ import { computed, ref, watch } from 'vue'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
 type Lang = 'zh-CN' | 'en-US'
-type NodeViewMode = 'card' | 'list'
+export type CardStyle = 'namecard' | 'badge' | 'dial' | 'bar'
 type SortMode = 'renewal' | 'notion' | 'name' | 'country'
 type EarthViewMode = 'earth' | 'earth-stop' | 'maps' | 'cards' | 'hide'
 
@@ -21,6 +21,12 @@ const BYTE_DECIMALS: ByteDecimalsConfig = {
 
 function isValidThemeMode(value: unknown): value is ThemeMode {
   return value === 'auto' || value === 'light' || value === 'dark'
+}
+
+export const CARD_STYLES: CardStyle[] = ['namecard', 'badge', 'dial', 'bar']
+
+function isValidCardStyle(value: unknown): value is CardStyle {
+  return typeof value === 'string' && (CARD_STYLES as string[]).includes(value)
 }
 
 function isValidEarthViewMode(value: unknown): value is EarthViewMode {
@@ -41,37 +47,19 @@ const useAppStore = defineStore('app', () => {
   // 首页滚动位置记忆
   const homeScrollPosition = ref<number>(0)
 
-  // 使用 null 表示未设置，等待主题配置加载后决定
-  const storedViewMode = useStorageAsync<NodeViewMode | null>('cardViewMode', null, localStorage)
+  // 访客自己选过的卡片样式；null 表示没选过，跟随站长设置的默认样式
+  const storedCardStyle = useStorageAsync<CardStyle | null>('cardStyle', null, localStorage)
 
-  // 计算属性：从主题配置获取默认视图模式
-  const defaultViewMode = computed<NodeViewMode>(() => {
-    const settings = publicSettings.value?.theme_settings
-    if (settings && typeof settings.defaultViewMode === 'string') {
-      const mode = settings.defaultViewMode
-      if (mode === 'card' || mode === 'list') {
-        return mode
-      }
-    }
-    return 'card'
+  const defaultCardStyle = computed<CardStyle>(() => {
+    const style = publicSettings.value?.theme_settings?.defaultCardStyle
+    return isValidCardStyle(style) ? style : 'namecard'
   })
 
-  // 校验视图模式是否为合法值
-  function isValidViewMode(value: string | null): value is NodeViewMode {
-    return value === 'card' || value === 'list'
-  }
-
-  // 当前实际使用的视图模式
-  const nodeViewMode = computed<NodeViewMode>({
-    get: () => {
-      // 校验 storedViewMode 是否为合法值，非法值时使用默认值
-      if (storedViewMode.value !== null && isValidViewMode(storedViewMode.value)) {
-        return storedViewMode.value
-      }
-      return defaultViewMode.value
-    },
+  // 当前实际使用的卡片样式
+  const cardStyle = computed<CardStyle>({
+    get: () => isValidCardStyle(storedCardStyle.value) ? storedCardStyle.value : defaultCardStyle.value,
     set: (val) => {
-      storedViewMode.value = val
+      storedCardStyle.value = val
     },
   })
 
@@ -259,14 +247,6 @@ const useAppStore = defineStore('app', () => {
     return 0
   })
 
-  // 当 publicSettings 加载后，如果 localStorage 没有保存过视图模式或值为非法值，使用默认值
-  watch(publicSettings, (settings) => {
-    if (settings && !isValidViewMode(storedViewMode.value)) {
-      // 触发 computed setter，会自动保存到 localStorage
-      storedViewMode.value = defaultViewMode.value
-    }
-  }, { immediate: true })
-
   // 使用 VueUse 的 usePreferredDark 检测系统主题偏好
   const prefersDark = usePreferredDark()
 
@@ -325,8 +305,8 @@ const useAppStore = defineStore('app', () => {
     resolvedThemeMode,
     lang,
     nodeSelectedGroup,
-    nodeViewMode,
-    defaultViewMode,
+    cardStyle,
+    defaultCardStyle,
     defaultSort,
     sitename,
     byteDecimals,

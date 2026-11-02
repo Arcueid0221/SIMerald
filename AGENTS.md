@@ -16,6 +16,7 @@ Repo guide for `simerald`.
 - `server/` backend: HTTP routes (`index.ts`), auth (`auth.ts`), Notion client (`notion.ts`), field mapping (`mapping.ts`), card building (`cards.ts`), public masking (`view.ts`), sync + daily scheduler (`sync.ts`), settings (`settings.ts`), demo data (`demo.ts`)
 - `shared/types.ts` API types; `shared/settings-schema.ts` theme settings schema (drives backend validation and the admin form)
 - `public/assets/flags/` Twemoji flag SVGs, served as `/assets/flags/<ISO>.svg`
+- Carrier logos are not in the repo: they live in `<data dir>/logos/`, named after the carrier (case, spaces and punctuation ignored), served as `/logos/<file>` by `server/logos.ts`
 - `deploy/compose.yaml` example deployment; `Dockerfile` builds frontend then runs `node server/index.ts`
 
 ## Commands
@@ -34,7 +35,7 @@ There is no test suite. Verify with lint + type-check + build, and by running th
 
 ## Rules that matter
 
-- Privacy: anything not explicitly whitelisted in `server/view.ts` must never reach the public `/api/cards` response. Login-only fields: full number, services, account, payment accounts, data check, Notion URL, record titles and accounts
+- Privacy: anything not explicitly whitelisted in `server/view.ts` must never reach the public `/api/cards` response. Login-only fields: full number, device, services, account, payment accounts, data check, Notion URL, record titles and accounts
 - Server code must stay erasable-only TypeScript (no enums, no parameter properties, `.ts` extensions in relative imports) because Node strips types at runtime
 - Secrets (Notion token, password hash, TOTP secret) live only in the data directory or env vars, never in the repo
 - State-changing API calls require the `X-SIMerald-Request: 1` header

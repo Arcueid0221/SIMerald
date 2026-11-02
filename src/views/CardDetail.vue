@@ -100,11 +100,13 @@ const metricCards = computed<MetricCard[]>(() => {
 
 const numberInfo = computed<InfoItem[]>(() => {
   const card = data.value
+  // 使用设备只给站长看
+  const deviceLocked = !cardsStore.full
   return [
     { label: '号码', value: card ? getNumberDisplay(card) : '-', icon: 'tabler:phone', valueClass: 'font-mono' },
     { label: '国家/地区', value: card?.countryName || '-', icon: 'tabler:world' },
     { label: '卡片类型', value: card ? shortTypeLabel(card.type) : '-', icon: 'tabler:device-sim' },
-    { label: '使用设备', value: card?.device || '-', icon: 'tabler:device-mobile' },
+    { label: '使用设备', value: deviceLocked ? '登录后可见' : card?.device || '-', icon: 'tabler:device-mobile', locked: deviceLocked },
   ]
 })
 

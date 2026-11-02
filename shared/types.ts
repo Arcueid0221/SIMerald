@@ -52,8 +52,6 @@ export interface SimCard {
   type: string
   typeKind: CardKind
   typeColor: NotionColor
-  /** 主要使用设备 */
-  device: string | null
   /** 保号动作 */
   keepAlive: string[]
   /** 续费周期（天），不固定时为 0 */
@@ -84,7 +82,11 @@ export interface SimCard {
   /** Notion 里的排列顺序 */
   order: number
   history: SimRecord[]
+  /** 运营商 Logo 地址（数据目录 logos/ 里有对应文件时才有），由接口补上 */
+  logo?: string | null
   // ===== 以下字段只在登录后返回 =====
+  /** 主要使用设备 */
+  device?: string | null
   number?: string | null
   services?: string[]
   account?: string | null

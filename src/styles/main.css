@@ -149,4 +149,9 @@
     align-items: center;
     justify-content: center;
   }
+
+  /* 深色模式下，快到期的天数带一点同色微光（卡片的「夜光」效果） */
+  .dark .sim-glow-text {
+    text-shadow: 0 0 14px color-mix(in oklab, currentColor 65%, transparent);
+  }
 }

@@ -30,7 +30,6 @@ export function toPublicCard(card: SimCard): SimCard {
     type: card.type,
     typeKind: card.typeKind,
     typeColor: card.typeColor,
-    device: card.device,
     keepAlive: card.keepAlive,
     cycleDays: card.cycleDays,
     cycleLabel: card.cycleLabel,
@@ -50,6 +49,7 @@ export function toPublicCard(card: SimCard): SimCard {
     urgency: card.urgency,
     order: card.order,
     history: card.history.map(publicRecord),
+    logo: card.logo ?? null,
   }
 }
 
