@@ -2,8 +2,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import path from 'node:path'
 
 /**
- * 数据目录里的小 JSON 文件读写。
- * 写入时先写临时文件再改名，避免写到一半断电导致文件损坏；权限设为只有 root 能读写。
+ * Small JSON file store in the data directory.
+ * Writes atomically via a temp file + rename to prevent corruption on crash, with 0600 permissions.
  */
 export class JsonStore {
   private dir: string
@@ -25,7 +25,7 @@ export class JsonStore {
       return JSON.parse(readFileSync(file, 'utf-8')) as T
     }
     catch (error) {
-      console.error(`[storage] ${name} 读取失败，使用默认值:`, error)
+      console.error(`[storage] Failed to read ${name}, using default:`, error)
       return fallback
     }
   }

@@ -4,7 +4,7 @@ export default antfu({
   formatters: true,
   vue: true,
 }, {
-  // 后端运行在 Node 上，直接使用 process / Buffer 全局变量，日志也需要 console.log
+  // Backend runs on Node and uses process/Buffer globals and console logging directly
   files: ['server/**/*.ts'],
   rules: {
     'node/prefer-global/process': 'off',

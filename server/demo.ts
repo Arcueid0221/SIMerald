@@ -1,7 +1,8 @@
 import type { CardKind, CardStatus, NotionColor, SimCard, SimRecord } from '../shared/types.ts'
 
 /**
- * 演示数据：没有配置 Notion 时显示。运营商名称和号码都是虚构的，日期按今天推算，演示站看起来永远是「活的」。
+ * Demo data shown when Notion is not configured. Uses fictional carriers and numbers
+ * with dates computed relative to today so the demo always looks active.
  */
 
 interface DemoSpec {

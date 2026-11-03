@@ -46,7 +46,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    // 本地开发时把接口请求转给后端（node server/index.ts，默认 25780 端口）
+    // Proxy API requests to the backend server during local development
     proxy: {
       '/api': 'http://127.0.0.1:25780',
     },

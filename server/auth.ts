@@ -2,8 +2,8 @@ import type { JsonStore } from './storage.ts'
 import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto'
 
 /**
- * 站长登录：密码（scrypt 哈希）+ TOTP 两步验证 + 一次性恢复码。
- * 只有一个账号。会话令牌只在服务器上保存哈希值。
+ * Owner authentication: scrypt password hash + TOTP 2FA + one-time recovery codes.
+ * Single-account design. Session tokens are stored on the server as hashes only.
  */
 
 const AUTH_FILE = 'auth.json'
@@ -73,7 +73,7 @@ export class AuthError extends Error {
 
 export interface NewSession {
   token: string
-  /** 记住设备时 cookie 的有效秒数；不记住时为 undefined（浏览器关闭即失效） */
+  /** Cookie Max-Age in seconds when "remember device" is enabled; undefined for session cookies */
   maxAgeSeconds?: number
 }
 
@@ -143,7 +143,7 @@ function hotp(secret: Buffer, counter: number): string {
   return String(binary % 1_000_000).padStart(6, '0')
 }
 
-/** 匹配成功返回使用的时间步，用于防止同一个验证码被重复使用 */
+/** Returns the matched time step on success so the same code cannot be replayed */
 function matchTotp(secretBase32: string, code: string, lastCounter: number): number | null {
   if (!TOTP_REGEX.test(code))
     return null
@@ -228,7 +228,7 @@ export class AuthService {
     return !this.data.passwordHash || !this.data.totpSecret
   }
 
-  /** 首次启动时生成一次性设置密钥，防止别人抢先设置站长密码 */
+  /** Generate a one-time setup key on first boot to prevent unauthorized initial setup */
   private ensureSetupKey(): void {
     if (!this.isSetupRequired())
       return
@@ -238,10 +238,10 @@ export class AuthService {
       this.save()
     }
     this.store.writeText(SETUP_KEY_FILE, `${this.data.setupKey}\n`)
-    console.log(`[auth] 还没有设置站长账号。首次设置密钥：${this.data.setupKey}（也保存在数据目录的 ${SETUP_KEY_FILE}）`)
+    console.log(`[auth] Owner account not set up yet. Initial setup key: ${this.data.setupKey} (also saved to ${SETUP_KEY_FILE} in the data directory)`)
   }
 
-  // ===== 防暴力破解 =====
+  // ===== Brute-force protection =====
 
   private checkLock(ip: string): void {
     const now = Date.now()
@@ -263,7 +263,7 @@ export class AuthService {
     if (entry.count >= IP_MAX_FAILS) {
       entry.lockedUntil = now + IP_LOCK_MS
       entry.count = 0
-      console.warn(`[auth] ${ip} 连续输错，锁定 15 分钟`)
+      console.warn(`[auth] ${ip} locked for 15 minutes after repeated failed attempts`)
     }
     this.ipFails.set(ip, entry)
     this.globalFails.push(now)
@@ -273,7 +273,7 @@ export class AuthService {
     this.ipFails.delete(ip)
   }
 
-  // ===== 会话 =====
+  // ===== Sessions =====
 
   private pruneSessions(): void {
     const now = Date.now()
@@ -326,9 +326,9 @@ export class AuthService {
     return this.data.recoveryCodes.length
   }
 
-  // ===== 验证 =====
+  // ===== Verification =====
 
-  /** 校验 6 位验证码或恢复码；恢复码用过即作废 */
+  /** Verify a 6-digit TOTP code or a single-use recovery code */
   private verifySecondFactor(code: unknown, secret = this.data.totpSecret): boolean {
     if (typeof code !== 'string' || !secret)
       return false
@@ -348,11 +348,11 @@ export class AuthService {
       return false
     this.data.recoveryCodes.splice(index, 1)
     this.save()
-    console.warn(`[auth] 使用了一个恢复码，还剩 ${this.data.recoveryCodes.length} 个`)
+    console.warn(`[auth] Recovery code used, ${this.data.recoveryCodes.length} remaining`)
     return true
   }
 
-  /** 修改账号设置前再确认一次密码和验证码 */
+  /** Re-verify password and 2FA code before sensitive account changes */
   private reauthenticate(ip: string, password: unknown, code: unknown): void {
     this.checkLock(ip)
     const passwordOk = typeof password === 'string' && !!this.data.passwordHash && verifyPassword(password, this.data.passwordHash)
@@ -395,7 +395,7 @@ export class AuthService {
     return pending
   }
 
-  // ===== 首次设置 =====
+  // ===== Initial setup =====
 
   beginSetup(ip: string, setupKey: unknown, password: unknown): TotpEnrollment {
     if (!this.isSetupRequired())
@@ -430,11 +430,11 @@ export class AuthService {
     this.data.sessions = []
     this.save()
     this.store.writeText(SETUP_KEY_FILE, '站长账号已设置，这个密钥已作废。\n')
-    console.log('[auth] 站长账号设置完成')
+    console.log('[auth] Owner account setup completed')
     return { session: this.createSession(false), recoveryCodes }
   }
 
-  // ===== 登录 =====
+  // ===== Login =====
 
   login(ip: string, password: unknown, code: unknown, remember: unknown): NewSession {
     if (this.isSetupRequired())
@@ -442,18 +442,18 @@ export class AuthService {
     this.checkLock(ip)
     const passwordOk = typeof password === 'string' && password.length <= 256
       && verifyPassword(password, this.data.passwordHash!)
-    // 密码错误时不再校验验证码，避免消耗恢复码
+    // Skip second-factor check if password is wrong to avoid consuming a recovery code
     if (!passwordOk || !this.verifySecondFactor(code)) {
       this.recordFail(ip)
-      console.warn(`[auth] 登录失败：${ip}`)
+      console.warn(`[auth] Login failed: ${ip}`)
       throw new AuthError(401, '密码或验证码错误')
     }
     this.recordSuccess(ip)
-    console.log(`[auth] 登录成功：${ip}`)
+    console.log(`[auth] Login succeeded: ${ip}`)
     return this.createSession(remember === true)
   }
 
-  // ===== 账号安全 =====
+  // ===== Account security =====
 
   changePassword(ip: string, currentPassword: unknown, code: unknown, newPassword: unknown, currentToken: string | undefined): void {
     const next = validatePassword(newPassword)
@@ -461,7 +461,7 @@ export class AuthService {
     this.data.passwordHash = hashPassword(next)
     this.save()
     this.logoutOthers(currentToken)
-    console.log('[auth] 密码已修改，其他设备已退出')
+    console.log('[auth] Password changed; other sessions logged out')
   }
 
   beginRebind(ip: string, currentPassword: unknown, code: unknown): TotpEnrollment {
@@ -482,7 +482,7 @@ export class AuthService {
     this.data.pending = null
     const codes = this.generateRecoveryCodes()
     this.save()
-    console.log('[auth] 两步验证已重新绑定')
+    console.log('[auth] TOTP 2FA rebound')
     return codes
   }
 

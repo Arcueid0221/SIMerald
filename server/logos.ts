@@ -3,9 +3,9 @@ import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 /**
- * 运营商 Logo。图片放在数据目录的 logos/ 里，文件名就是运营商名称，
- * 比如 `Harbour Mobile.png`、`harbour-mobile.webp` 都能对上「Harbour Mobile」：
- * 比较时忽略大小写、空格和标点。Logo 不进仓库，换图只要替换文件。
+ * Carrier logos stored under `<dataDir>/logos/`, named after the carrier.
+ * Matching ignores case, whitespace, and punctuation, so both `Harbour Mobile.png`
+ * and `harbour-mobile.webp` match "Harbour Mobile".
  */
 
 const LOGO_TYPES: Record<string, string> = {
@@ -16,7 +16,7 @@ const LOGO_TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
 }
 
-/** 目录列表缓存一分钟，换图后最多一分钟生效 */
+/** Directory listing cache TTL (1 minute); replaced logo files take up to 1 minute to take effect. */
 const LIST_CACHE_MS = 60 * 1000
 const IGNORED_CHARS_REGEX = /[\s\p{P}\p{S}]+/gu
 
@@ -56,7 +56,7 @@ export class LogoStore {
     return this.listUrls().get(logoKey(carrier)) ?? null
   }
 
-  /** 处理 GET /logos/<文件名>；返回 false 表示文件不存在 */
+  /** Serves `GET /logos/<filename>`; returns false if the file does not exist. */
   serve(req: IncomingMessage, res: ServerResponse, pathname: string, headers: Record<string, string>): boolean {
     let name: string
     try {
@@ -72,7 +72,7 @@ export class LogoStore {
     res.writeHead(200, {
       ...headers,
       'Content-Type': type,
-      // 地址里带了文件修改时间，换图后地址会变
+      // URLs include file mtime as `?v=`, so responses can be cached immutably
       'Cache-Control': 'public, max-age=31536000, immutable',
     })
     if (req.method === 'HEAD')

@@ -29,7 +29,7 @@ const MIME_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 }
 
-/** 只在 HTTPS 访问时发送：让浏览器一年内只用 HTTPS 打开本站（不含子域名，不加入预载列表） */
+/** Sent only over HTTPS: 1-year HSTS without includeSubDomains or preload */
 const HSTS_VALUE = 'max-age=31536000'
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -84,13 +84,13 @@ function parseCookies(header: string | undefined): Record<string, string> {
       result[name] = decodeURIComponent(value)
     }
     catch {
-      // 格式错误的 cookie 直接忽略，当作没有
+      // Ignore malformed cookies
     }
   }
   return result
 }
 
-/** 访客 IP。只认 TRUST_PROXY 指定的请求头，没配置时不信任任何请求头 */
+/** Client IP from the header configured via TRUST_PROXY; ignores proxy headers when unset */
 function clientIp(req: IncomingMessage): string {
   if (config.trustProxy === 'cloudflare') {
     const cf = req.headers['cf-connecting-ip']
@@ -98,7 +98,7 @@ function clientIp(req: IncomingMessage): string {
       return cf.trim()
   }
   if (config.trustProxy === 'xff') {
-    // 反向代理会把真实来源追加在最后，前面的部分可能是访客自己伪造的
+    // Reverse proxies append the client IP at the end; earlier entries can be spoofed by the client
     const forwarded = req.headers['x-forwarded-for']
     const last = typeof forwarded === 'string' ? forwarded.split(',').at(-1)?.trim() : ''
     if (last)
@@ -209,7 +209,7 @@ async function runSyncForResponse(reason: string): Promise<void> {
     await sync.run(reason)
   }
   catch {
-    // 失败原因已经写进同步状态，前端从 status 里读
+    // Sync errors are recorded in sync status and read by the frontend from there
   }
 }
 
@@ -348,7 +348,7 @@ function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string
 
   let isFallback = false
   if (!existsSync(filePath) || statSync(filePath).isDirectory()) {
-    // 带扩展名的资源找不到就是真的 404；其余交给前端路由
+    // Missing paths with a file extension are real 404s; other paths fall back to the SPA router
     if (path.extname(pathname)) {
       res.writeHead(404, { ...SECURITY_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' }).end('Not Found')
       return
@@ -375,12 +375,12 @@ function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string
   createReadStream(filePath).pipe(res)
 }
 
-/** 经过反向代理、但访客用的是 http 时跳转到 https；直接访问（比如容器健康检查）不受影响 */
+/** Redirect HTTP requests behind a reverse proxy to HTTPS; direct connections (e.g. container health checks) are unaffected */
 function redirectToHttps(req: IncomingMessage, res: ServerResponse, method: string): boolean {
   const host = req.headers.host
   if (config.trustProxy === 'none' || req.headers['x-forwarded-proto'] !== 'http' || !host)
     return false
-  // GET/HEAD 用 301；其他方法用 308，浏览器会保持原来的请求方法和内容
+  // Use 301 for GET/HEAD and 308 for other methods to preserve the request method and body
   res.writeHead(method === 'GET' || method === 'HEAD' ? 301 : 308, {
     ...SECURITY_HEADERS,
     'Location': `https://${host}${req.url ?? '/'}`,
@@ -437,20 +437,20 @@ const server = createServer(async (req, res) => {
       sendJson(res, error.status, { error: error.message })
       return
     }
-    console.error('[http] 未处理的错误:', error)
+    console.error('[http] Unhandled error:', error)
     sendJson(res, 500, { error: '服务器内部错误' })
   }
 })
 
 server.listen(config.port, config.host, () => {
-  console.log(`[simerald] v${config.version} 已启动：http://${config.host}:${config.port}（数据目录 ${config.dataDir}）`)
-  console.log(`[simerald] 访客 IP 来源：${config.trustProxy === 'cloudflare' ? 'CF-Connecting-IP' : config.trustProxy === 'xff' ? 'X-Forwarded-For 最后一个地址' : '连接来源地址（TRUST_PROXY=none）'}`)
-  console.log(sync.isDemo() ? '[simerald] 没有配置 Notion token，当前显示演示数据' : '[simerald] 已配置 Notion，数据每天同步一次')
+  console.log(`[simerald] v${config.version} listening on http://${config.host}:${config.port} (data dir: ${config.dataDir})`)
+  console.log(`[simerald] Client IP source: ${config.trustProxy === 'cloudflare' ? 'CF-Connecting-IP' : config.trustProxy === 'xff' ? 'last X-Forwarded-For entry' : 'socket remote address (TRUST_PROXY=none)'}`)
+  console.log(sync.isDemo() ? '[simerald] Notion token not configured; serving demo data' : '[simerald] Notion configured; syncing daily')
   sync.start()
 })
 
 function shutdown(signal: string): void {
-  console.log(`[simerald] 收到 ${signal}，正在退出`)
+  console.log(`[simerald] Received ${signal}, shutting down`)
   sync.stop()
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 3000).unref()

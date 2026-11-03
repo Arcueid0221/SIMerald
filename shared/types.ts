@@ -1,93 +1,93 @@
 /**
- * SIMerald 前后端共用的数据类型。
- * 后端用 Node 原生的类型剥离直接运行，这里只能写类型（不能有 enum 等需要编译的语法）。
+ * Shared types between frontend and backend.
+ * Executed directly via Node native type-stripping; must contain only type declarations (no runtime syntax like enums).
  */
 
 export type CardStatus = 'active' | 'expired' | 'cancelled'
 
-/** 卡片类型大类，决定图标 */
+/** High-level card category, determines the icon */
 export type CardKind = 'physical' | 'adapter' | 'embedded' | 'virtual'
 
-/** Notion select 选项颜色 */
+/** Notion select option colors */
 export type NotionColor
   = | 'default' | 'gray' | 'brown' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'red'
 
 export interface SimRecord {
-  /** 由 Notion 页面 ID 派生的不透明 ID，不能反推出 Notion 页面 */
+  /** Opaque ID derived from the Notion page ID (irreversible) */
   id: string
-  /** 消费类型：首次购买/开卡、续费/保号、额外充值、其他费用 */
+  /** Transaction category (initial purchase, renewal, top-up, or other fee) */
   type: string
-  /** 消费日期 YYYY-MM-DD */
+  /** Transaction date (YYYY-MM-DD) */
   date: string | null
-  /** 支付金额（原币种） */
+  /** Payment amount in original currency */
   amount: number | null
-  /** 支付币种 ISO 代码 */
+  /** ISO currency code */
   currency: string
-  /** 当时汇率：1 单位外币 = ? CNY */
+  /** Exchange rate at transaction time (1 unit of foreign currency in CNY) */
   rate: number | null
-  /** 等额人民币（Notion 公式算好的） */
+  /** Equivalent amount in CNY (calculated by Notion formula) */
   amountCNY: number | null
-  /** 本次有效期延至 YYYY-MM-DD */
+  /** New expiration date after this transaction (YYYY-MM-DD) */
   extendsTo: string | null
-  /** 仅登录后返回：记录标题 */
+  /** Returned only when authenticated: record title */
   title?: string
-  /** 仅登录后返回：扣款账户名称 */
+  /** Returned only when authenticated: payment account names */
   accounts?: string[]
 }
 
 export interface SimCard {
-  /** 由 Notion 页面 ID 派生的不透明 ID，用在详情页地址里；Notion 链接只在 notionUrl（需登录） */
+  /** Opaque ID derived from the Notion page ID, used in detail URLs; raw Notion link is only in notionUrl when authenticated */
   id: string
-  /** 卡片名称，如 "Harbour Mobile · 0123" */
+  /** Display name, e.g. "Harbour Mobile · 0123" */
   name: string
-  /** 运营商简称，如 "Harbour Mobile" */
+  /** Short carrier name, e.g. "Harbour Mobile" */
   carrier: string
-  /** 号码后 4 位 */
+  /** Last 4 digits of the phone number */
   last4: string
-  /** 公开展示用的打码号码，如 "•••• 0123" */
+  /** Masked phone number for public display, e.g. "•••• 0123" */
   numberMasked: string
-  /** 国旗 emoji，如 "🇪🇪"；没有时为空字符串 */
+  /** Flag emoji, e.g. "🇪🇪", or empty string if none */
   region: string
-  /** 国家/地区名称，如 "爱沙尼亚" */
+  /** Country or region name */
   countryName: string
   typeKind: CardKind
   typeColor: NotionColor
-  /** 保号动作 */
+  /** Actions required to keep the number active */
   keepAlive: string[]
-  /** 续费周期（天），不固定时为 0 */
+  /** Renewal cycle in days, or 0 if irregular */
   cycleDays: number
-  /** 续费周期原文 */
+  /** Raw renewal cycle text */
   cycleLabel: string
-  /** 续费金额 */
+  /** Renewal price */
   price: number
-  /** 续费币种 ISO 代码 */
+  /** ISO currency code for renewal price */
   currency: string
-  /** 当前有效期至 */
+  /** Current expiration date */
   expiresAt: string | null
-  /** 下次续费日期（日期范围时为开始日期） */
+  /** Next renewal date (start date if a date range) */
   nextRenewalAt: string | null
-  /** 下次续费日期为范围时的结束日期 */
+  /** End date when next renewal date is a range */
   nextRenewalEnd: string | null
-  /** 本期开始日期：设定当前有效期的那笔消费的日期 */
+  /** Current period start date (date of the transaction that set the current expiration) */
   periodStart: string | null
   status: CardStatus
   statusLabel: string
   cancelledAt: string | null
   firstPurchaseAt: string | null
   totalSpentCNY: number | null
-  /** 续费紧急度原文，可用于排序 */
+  /** Raw renewal urgency text, usable for sorting */
   urgency: string | null
-  /** Notion 里的排列顺序 */
+  /** Display order from Notion */
   order: number
   history: SimRecord[]
-  /** 运营商 Logo 地址（数据目录 logos/ 里有对应文件时才有），由接口补上 */
+  /** Carrier logo URL, populated by the API when a matching file exists in the data logos/ directory */
   logo?: string | null
-  // ===== 以下字段只在登录后返回 =====
-  /** 卡片类型原文 */
+  // Fields below are returned only when authenticated
+  /** Raw card type label */
   type?: string
   balance?: number | null
   balanceUpdatedAt?: string | null
-  /** 主要使用设备 */
+  /** Primary device */
   device?: string | null
   number?: string | null
   services?: string[]
@@ -103,7 +103,7 @@ export interface SiteInfo {
   sitename: string
   version: string
   gitHash: string
-  /** 没有配置 Notion 时使用内置演示数据 */
+  /** True when Notion is not configured and built-in demo data is served */
   demo: boolean
   syncedAt: string | null
   loggedIn: boolean
@@ -124,7 +124,7 @@ export interface SyncStatus {
   lastFinishedAt: string | null
   lastSuccessAt: string | null
   lastError: string | null
-  /** 同步成功但有部分内容被跳过时的提示 */
+  /** Warning when sync succeeded with some entries skipped */
   lastWarning: string | null
   lastReason: string | null
   cardCount: number
@@ -134,7 +134,7 @@ export interface SyncStatus {
 
 export interface NotionSettingsView {
   tokenConfigured: boolean
-  /** token 来自环境变量时，设置面板不能修改 */
+  /** True when the token is set via environment variable and cannot be modified in the UI */
   tokenFromEnv: boolean
   cardsDb: string
   recordsDb: string

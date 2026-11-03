@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# ---- 构建前端 ----
+# ---- Build frontend ----
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -10,7 +10,7 @@ ARG GIT_HASH=unknown
 ENV GIT_HASH=${GIT_HASH}
 RUN npm run build-only
 
-# ---- 运行：后端直接用 Node 运行 TypeScript（类型剥离），不需要编译 ----
+# ---- Runtime: Node runs backend TypeScript directly via native type-stripping ----
 FROM node:24-alpine
 WORKDIR /app
 ARG GIT_HASH=unknown

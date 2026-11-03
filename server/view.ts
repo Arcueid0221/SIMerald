@@ -1,8 +1,8 @@
 import type { SimCard, SimRecord } from '../shared/types.ts'
 
 /**
- * 公开接口的打码。用白名单的方式挑出可以公开的字段，
- * 这样以后给 SimCard 加了新的敏感字段，也不会不小心公开出去。
+ * Redacts cards for the public API using an explicit allowlist of fields,
+ * so newly added sensitive fields on SimCard are never exposed by default.
  */
 
 function publicRecord(record: SimRecord): SimRecord {

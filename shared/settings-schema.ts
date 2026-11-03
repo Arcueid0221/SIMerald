@@ -1,6 +1,6 @@
 /**
- * 主题设置项定义（对应 Emerald 的 komari-theme.json → configuration.data）。
- * 后端用它校验和补默认值，前端设置面板用它生成表单。
+ * Theme settings schema (corresponds to Emerald's komari-theme.json -> configuration.data).
+ * Used by the backend for validation and defaults, and by the frontend settings panel to render forms.
  */
 
 export type SettingType = 'title' | 'switch' | 'string' | 'number' | 'select' | 'richtext'
@@ -10,9 +10,9 @@ export interface SettingItem {
   key?: string
   name: string
   default?: string | number | boolean
-  /** select 的可选值，逗号分隔 */
+  /** Comma-separated allowed values for select fields */
   options?: string
-  /** select 选项的中文名，和 options 一一对应 */
+  /** Comma-separated display labels corresponding to options */
   optionLabels?: string
   help?: string
   min?: number
@@ -65,7 +65,7 @@ export function getDefaultSettings(): Record<string, SettingValue> {
   return result
 }
 
-/** 按定义校验并补全设置；未知的键丢弃，类型不对的用默认值 */
+/** Validate and populate settings against the schema, dropping unknown keys and falling back to defaults on invalid values */
 export function sanitizeSettings(input: unknown): Record<string, SettingValue> {
   const source = (input && typeof input === 'object') ? input as Record<string, unknown> : {}
   const result = getDefaultSettings()

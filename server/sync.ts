@@ -44,7 +44,7 @@ function timezoneOffsetMs(date: Date, timeZone: string): number {
   return asUtc - Math.floor(date.getTime() / 1000) * 1000
 }
 
-/** 计算下一次在指定时区的 HH:mm 执行的时间点 */
+/** Computes the next occurrence of `HH:mm` in the given IANA timezone. */
 export function computeNextRun(time: string, timeZone: string, now = new Date()): Date {
   const [hour, minute] = time.split(':').map(Number) as [number, number]
   const p = zonedParts(now, timeZone)
@@ -150,7 +150,7 @@ export class SyncService {
     const conn = this.settings.notion
     this.status.lastStartedAt = new Date().toISOString()
     this.status.lastReason = reason
-    console.log(`[sync] 开始同步（${reason}）`)
+    console.log(`[sync] Starting sync (${reason})`)
 
     try {
       if (!conn.token)
@@ -161,7 +161,7 @@ export class SyncService {
       const client = new NotionClient(conn.token)
       const cardsSource = await client.resolveDataSource(conn.cardsDb)
       const recordsSource = await client.resolveDataSource(conn.recordsDb)
-      // 扣款账户只用来显示名称，读不到时跳过，不影响其他数据
+      // Payment accounts are only used to resolve display names; skip on failure without failing the sync
       let accountPages: NotionPage[] = []
       let warning: string | null = null
       if (conn.accountsDb) {
@@ -186,12 +186,12 @@ export class SyncService {
       this.status.lastWarning = warning
       this.status.cardCount = cards.length
       this.status.recordCount = recordCount
-      console.log(`[sync] 同步完成：${cards.length} 张卡，${recordCount} 条消费记录`)
+      console.log(`[sync] Sync complete: ${cards.length} cards, ${recordCount} records`)
     }
     catch (error) {
       const message = error instanceof NotionError || error instanceof Error ? error.message : String(error)
       this.status.lastError = message
-      console.error(`[sync] 同步失败：${message}`)
+      console.error(`[sync] Sync failed: ${message}`)
       throw error
     }
     finally {

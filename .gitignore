@@ -40,7 +40,7 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 
-# SIMerald 本地运行时的数据目录（站长密码、Notion token 都在里面）
+# SIMerald runtime data directory (contains password hash and Notion token)
 data/
 .mimocode
 .zcode

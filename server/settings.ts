@@ -25,7 +25,7 @@ interface StoredSettings {
 
 interface StoredSecrets {
   notionToken: string | null
-  /** 生成对外卡片 ID 用的密钥，首次启动时自动生成 */
+  /** Secret key for deriving public card IDs, generated automatically on first boot */
   idKey?: string
 }
 
@@ -116,7 +116,7 @@ export class SettingsService {
     this.save()
   }
 
-  /** 当前生效的 Notion 连接信息：设置面板里填的优先，没填用环境变量 */
+  /** Effective Notion connection config: settings panel values take precedence over environment variables */
   get notion(): NotionConnection {
     const pick = (saved: string, fallback: string | null) => normalizeNotionId(saved) ?? (fallback ? normalizeNotionId(fallback) : null)
     let mapping = DEFAULT_MAPPING
@@ -124,7 +124,7 @@ export class SettingsService {
       mapping = parseMappingText(this.data.notion.mapping)
     }
     catch {
-      // 保存时已经校验过，这里只是兜底
+      // Validated on save; fallback only
     }
     return {
       token: this.config.envNotionToken ?? this.secrets.notionToken,
@@ -166,7 +166,7 @@ export class SettingsService {
       catch {
         throw new Error('字段映射不是合法的 JSON')
       }
-      // 和默认值一样就不保存，以后默认值更新时能自动跟上
+      // Omit when identical to the default so future default updates take effect automatically
       const normalized = JSON.stringify(JSON.parse(input.mapping))
       mappingText = normalized === JSON.stringify(DEFAULT_MAPPING) ? '' : input.mapping
     }

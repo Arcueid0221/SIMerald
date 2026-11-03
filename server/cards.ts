@@ -5,7 +5,7 @@ import { createHmac } from 'node:crypto'
 import { findTitleProperty, propDate, propList, propNumber, propRelation, propSelect, propText } from './notion.ts'
 
 /**
- * 把 Notion 页面整理成 SimCard。这里得到的是「完整数据」，公开接口返回前还要经过 view.ts 打码。
+ * Converts Notion pages into full SimCard objects. Public API responses must pass through view.ts for redaction.
  */
 
 const REGION_FLAG_REGEX = /[\u{1F1E6}-\u{1F1FF}]{2}/u
@@ -93,7 +93,7 @@ const STATUS_LABELS: Record<CardStatus, string> = {
   cancelled: '已注销',
 }
 
-/** 对外用的 ID：用站点自己的密钥对 Notion 页面 ID 做 HMAC，同一张卡每次同步结果相同，但反推不出 Notion 页面 */
+/** Derives a stable, non-reversible public ID by HMAC-hashing the Notion page ID with the site secret. */
 export function opaqueId(notionId: string, idKey: string): string {
   return createHmac('sha256', idKey).update(notionId).digest('hex').slice(0, 16)
 }

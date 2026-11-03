@@ -1,6 +1,6 @@
 /**
- * Notion 字段名映射。默认值对应作者自己的 Notion 模板；
- * 别人的数据库字段名不同，可以在设置面板里改这份 JSON。
+ * Notion property name mapping. Defaults match the author's Notion template
+ * and can be overridden via JSON in the settings panel.
  */
 
 export interface FieldMapping {
@@ -41,7 +41,7 @@ export interface FieldMapping {
     extendsTo: string
     accounts: string
   }
-  /** 号码状态公式的取值 → 状态 */
+  /** Maps status property values to internal card statuses. */
   statusValues: {
     active: string[]
     expired: string[]
@@ -94,7 +94,7 @@ export const DEFAULT_MAPPING: FieldMapping = {
   },
 }
 
-/** 把用户填的 JSON 和默认值合并；只接受字符串（或状态值的字符串数组），其他一律忽略 */
+/** Merges user-supplied JSON into DEFAULT_MAPPING, ignoring non-string values (or non-string-array statusValues). */
 export function mergeMapping(input: unknown): FieldMapping {
   const result: FieldMapping = JSON.parse(JSON.stringify(DEFAULT_MAPPING))
   if (!input || typeof input !== 'object')

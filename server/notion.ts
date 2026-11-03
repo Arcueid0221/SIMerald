@@ -1,6 +1,6 @@
 /**
- * Notion 官方 API 的最小客户端（只读）。
- * 使用 2025-09-03 版本的接口：数据库下面是 data source，查询走 /v1/data_sources/{id}/query。
+ * Minimal read-only client for the official Notion API.
+ * Uses API version 2025-09-03, where databases contain data sources queried via /v1/data_sources/{id}/query.
  */
 
 const NOTION_API = 'https://api.notion.com/v1'
@@ -32,7 +32,7 @@ export interface NotionDate {
   end: string | null
 }
 
-/** 页面属性的原始结构，只声明用得到的字段 */
+/** Raw Notion page property value, declaring only the fields we use. */
 export interface NotionPropertyValue {
   type: string
   title?: Array<{ plain_text: string }>
@@ -73,7 +73,7 @@ export interface NotionPage {
   properties: Record<string, NotionPropertyValue>
 }
 
-/** 把 Notion 链接或带/不带横线的 ID 统一成带横线的 UUID */
+/** Normalizes a Notion URL or dashed/undashed ID into a dashed UUID. */
 export function normalizeNotionId(input: string): string | null {
   const match = input.replace(DASHES_REGEX, '').match(HEX32_REGEX)
   if (!match)
@@ -154,7 +154,7 @@ export class NotionClient {
     }
   }
 
-  /** 接受 data source ID 或 database ID，返回 data source ID */
+  /** Accepts a data source ID or database ID and returns the data source ID. */
   async resolveDataSource(id: string): Promise<string> {
     try {
       const ds = await this.request<{ id: string }>('GET', `/data_sources/${id}`)
@@ -191,7 +191,7 @@ export class NotionClient {
   }
 }
 
-// ===== 属性取值 =====
+// ===== Property extractors =====
 
 function plain(list: Array<{ plain_text: string }> | undefined): string {
   return (list ?? []).map(t => t.plain_text).join('').trim()

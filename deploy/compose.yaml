@@ -1,4 +1,4 @@
-# SIMerald 部署示例。复制到服务器上，按需修改后运行：docker compose up -d
+# Example SIMerald deployment. Adjust as needed and run: docker compose up -d
 services:
   simerald:
     image: simerald:local
@@ -7,25 +7,25 @@ services:
     container_name: simerald
     restart: unless-stopped
     ports:
-      # 只监听本机，再用反向代理或 Cloudflare 隧道对外
+      # Bind to localhost only; expose via reverse proxy or Cloudflare Tunnel
       - '127.0.0.1:25780:25780'
     volumes:
-      # 数据目录：站长密码哈希、Notion token、设置和同步缓存都在这里，记得备份
-      # 容器内以 uid 1000 运行，宿主机目录需要：chown 1000:1000 <目录>
+      # Persistent data (owner password hash, Notion token, settings, sync cache).
+      # Container runs as UID 1000; ensure host directory is owned by 1000:1000.
       - ./data:/data
     environment:
       TZ: Asia/Shanghai
-      # 访客真实 IP 从哪里取（登录输错按 IP 锁定要用），按你的反向代理选：
-      #   cloudflare：Cloudflare Tunnel 或 Cloudflare 代理，用 CF-Connecting-IP
-      #   xff：Nginx / Caddy 等，用 X-Forwarded-For 的最后一个地址
-      #   none：没有反向代理（默认）
-      # 选错的话，别人可以伪造请求头绕过锁定，或者所有访客被当成同一个 IP
+      # Client IP source for login rate-limiting, matching your reverse proxy:
+      #   cloudflare: Cloudflare Tunnel / proxy (uses CF-Connecting-IP)
+      #   xff:        Nginx / Caddy / etc. (uses last address in X-Forwarded-For)
+      #   none:       Direct connection, no proxy (default)
+      # Misconfiguration allows header spoofing to bypass lockouts or groups all users under one IP.
       TRUST_PROXY: cloudflare
-      # 也可以不在这里写，登录后台后在「Notion 连接」里填
+      # Optional: can also be configured in the admin UI under Notion settings
       # NOTION_TOKEN: ntn_xxx
-      # NOTION_CARDS_DB: <SIM 卡数据库 ID>
-      # NOTION_RECORDS_DB: <消费记录数据库 ID>
-      # NOTION_ACCOUNTS_DB: <扣款账户数据库 ID，可选>
+      # NOTION_CARDS_DB: <cards database ID>
+      # NOTION_RECORDS_DB: <records database ID>
+      # NOTION_ACCOUNTS_DB: <accounts database ID, optional>
     mem_limit: 256m
     pids_limit: 128
     security_opt:
