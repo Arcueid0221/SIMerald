@@ -375,12 +375,28 @@ function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string
   createReadStream(filePath).pipe(res)
 }
 
+/** 经过反向代理、但访客用的是 http 时跳转到 https；直接访问（比如容器健康检查）不受影响 */
+function redirectToHttps(req: IncomingMessage, res: ServerResponse, method: string): boolean {
+  const host = req.headers.host
+  if (config.trustProxy === 'none' || req.headers['x-forwarded-proto'] !== 'http' || !host)
+    return false
+  // GET/HEAD 用 301；其他方法用 308，浏览器会保持原来的请求方法和内容
+  res.writeHead(method === 'GET' || method === 'HEAD' ? 301 : 308, {
+    ...SECURITY_HEADERS,
+    'Location': `https://${host}${req.url ?? '/'}`,
+    'Cache-Control': 'no-store',
+  }).end()
+  return true
+}
+
 const server = createServer(async (req, res) => {
   const method = req.method ?? 'GET'
-  if (isHttps(req))
-    res.setHeader('Strict-Transport-Security', HSTS_VALUE)
 
   try {
+    if (redirectToHttps(req, res, method))
+      return
+    if (isHttps(req))
+      res.setHeader('Strict-Transport-Security', HSTS_VALUE)
     let url: URL
     try {
       url = new URL(req.url ?? '/', 'http://localhost')
