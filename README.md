@@ -9,6 +9,8 @@
   <img src="docs/screenshot-light.webp" alt="SIMerald home page (demo data)" width="100%">
 </picture>
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![LINUX DO](https://img.shields.io/badge/LINUX%20DO-community-blue)](https://linux.do)
+
 English | [简体中文](README.zh-CN.md)
 
 </div>
@@ -97,6 +99,7 @@ For codebase architecture and conventions, see [`AGENTS.md`](AGENTS.md), [`src/A
 
 - UI derived from [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald) (MIT, Tokinx), inspired by [Komari Monitor](https://github.com/komari-monitor/komari)
 - Country flag graphics from [Twemoji](https://github.com/jdecked/twemoji) (CC-BY 4.0)
+- Thanks to the [LINUX DO](https://linux.do) community
 
 ## Authors and License
 

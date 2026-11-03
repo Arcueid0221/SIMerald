@@ -9,6 +9,8 @@
   <img src="docs/screenshot-light.webp" alt="SIMerald 首页（演示数据）" width="100%">
 </picture>
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![LINUX DO](https://img.shields.io/badge/LINUX%20DO-community-blue)](https://linux.do)
+
 [English](README.md) | 简体中文
 
 </div>
@@ -97,6 +99,7 @@ npm run build-only
 
 - 界面派生自 [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald)（MIT，Tokinx），设计灵感来自 [Komari Monitor](https://github.com/komari-monitor/komari)
 - 国旗图标来自 [Twemoji](https://github.com/jdecked/twemoji)（CC-BY 4.0）
+- 感谢 [LINUX DO](https://linux.do) 社区
 
 ## 作者与协议
 
