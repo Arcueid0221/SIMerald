@@ -48,8 +48,6 @@ export interface SimCard {
   region: string
   /** 国家/地区名称，如 "爱沙尼亚" */
   countryName: string
-  /** 卡片类型原文 */
-  type: string
   typeKind: CardKind
   typeColor: NotionColor
   /** 保号动作 */
@@ -62,8 +60,6 @@ export interface SimCard {
   price: number
   /** 续费币种 ISO 代码 */
   currency: string
-  balance: number | null
-  balanceUpdatedAt: string | null
   /** 当前有效期至 */
   expiresAt: string | null
   /** 下次续费日期（日期范围时为开始日期） */
@@ -85,6 +81,10 @@ export interface SimCard {
   /** 运营商 Logo 地址（数据目录 logos/ 里有对应文件时才有），由接口补上 */
   logo?: string | null
   // ===== 以下字段只在登录后返回 =====
+  /** 卡片类型原文 */
+  type?: string
+  balance?: number | null
+  balanceUpdatedAt?: string | null
   /** 主要使用设备 */
   device?: string | null
   number?: string | null

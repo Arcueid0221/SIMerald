@@ -19,7 +19,7 @@ export interface SimInfoRow {
   tooltip?: string
 }
 
-/** 四种卡片样式共用的展示数据 */
+/** 三种卡片样式共用的展示数据 */
 export function useSimCardView(getCard: () => SimCard) {
   const { rates } = useExchangeRates()
 

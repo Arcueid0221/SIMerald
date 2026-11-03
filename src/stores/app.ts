@@ -6,7 +6,7 @@ import { computed, ref, watch } from 'vue'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
 type Lang = 'zh-CN' | 'en-US'
-export type CardStyle = 'namecard' | 'badge' | 'dial' | 'bar'
+export type CardStyle = 'namecard' | 'dial' | 'bar'
 type SortMode = 'renewal' | 'notion' | 'name' | 'country'
 type EarthViewMode = 'earth' | 'earth-stop' | 'maps' | 'cards' | 'hide'
 
@@ -23,7 +23,7 @@ function isValidThemeMode(value: unknown): value is ThemeMode {
   return value === 'auto' || value === 'light' || value === 'dark'
 }
 
-export const CARD_STYLES: CardStyle[] = ['namecard', 'badge', 'dial', 'bar']
+export const CARD_STYLES: CardStyle[] = ['namecard', 'dial', 'bar']
 
 function isValidCardStyle(value: unknown): value is CardStyle {
   return typeof value === 'string' && (CARD_STYLES as string[]).includes(value)

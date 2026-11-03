@@ -100,13 +100,14 @@ const metricCards = computed<MetricCard[]>(() => {
 
 const numberInfo = computed<InfoItem[]>(() => {
   const card = data.value
-  // 使用设备只给站长看
-  const deviceLocked = !cardsStore.full
+  // 卡片类型和使用设备只给站长看
+  const locked = !cardsStore.full
+  const lockedValue = '登录后可见'
   return [
     { label: '号码', value: card ? getNumberDisplay(card) : '-', icon: 'tabler:phone', valueClass: 'font-mono' },
     { label: '国家/地区', value: card?.countryName || '-', icon: 'tabler:world' },
-    { label: '卡片类型', value: card ? shortTypeLabel(card.type) : '-', icon: 'tabler:device-sim' },
-    { label: '使用设备', value: deviceLocked ? '登录后可见' : card?.device || '-', icon: 'tabler:device-mobile', locked: deviceLocked },
+    { label: '卡片类型', value: locked ? lockedValue : card?.type ? shortTypeLabel(card.type) : '-', icon: 'tabler:device-sim', locked },
+    { label: '使用设备', value: locked ? lockedValue : card?.device || '-', icon: 'tabler:device-mobile', locked },
   ]
 })
 
@@ -124,11 +125,13 @@ const balanceInfo = computed<InfoItem[]>(() => {
   const card = data.value
   if (!card)
     return []
-  const balance = getBalanceInfo(card)
+  // 余额只给站长看
+  const locked = !cardsStore.full
+  const lockedValue = '登录后可见'
   const hold = getHoldInfo(card)
   return [
-    { label: '当前余额', value: balance.text, icon: 'tabler:wallet' },
-    { label: '余额更新', value: card.balanceUpdatedAt ?? '-', icon: 'tabler:clock', valueClass: isBalanceStale(card) ? 'text-yellow-600 dark:text-yellow-400' : '' },
+    { label: '当前余额', value: locked ? lockedValue : getBalanceInfo(card).text, icon: 'tabler:wallet', locked },
+    { label: '余额更新', value: locked ? lockedValue : card.balanceUpdatedAt ?? '-', icon: 'tabler:clock', locked, valueClass: !locked && isBalanceStale(card) ? 'text-yellow-600 dark:text-yellow-400' : '' },
     { label: '已持有', value: hold.days === null ? '-' : `${hold.days} 天`, icon: 'tabler:hourglass' },
   ]
 })
@@ -241,7 +244,10 @@ const spendSummary = computed(() => {
                 <Icon v-if="item.icon" :icon="item.icon" :width="14" :height="14" />
                 <span class="text-xs sm:text-sm">{{ item.label }}</span>
               </div>
-              <span class="text-xs sm:text-sm break-all" :class="item.valueClass">{{ item.value }}</span>
+              <span class="text-xs sm:text-sm break-all flex items-center gap-1" :class="[item.valueClass, item.locked && 'text-muted-foreground']">
+                <Icon v-if="item.locked" icon="tabler:lock" :width="12" :height="12" />
+                {{ item.value }}
+              </span>
             </div>
           </div>
         </CardX>
@@ -281,7 +287,10 @@ const spendSummary = computed(() => {
                 <Icon v-if="item.icon" :icon="item.icon" :width="14" :height="14" />
                 <span class="text-xs sm:text-sm">{{ item.label }}</span>
               </div>
-              <span class="text-xs sm:text-sm break-all" :class="item.valueClass">{{ item.value }}</span>
+              <span class="text-xs sm:text-sm break-all flex items-center gap-1" :class="[item.valueClass, item.locked && 'text-muted-foreground']">
+                <Icon v-if="item.locked" icon="tabler:lock" :width="12" :height="12" />
+                {{ item.value }}
+              </span>
             </div>
           </div>
         </CardX>

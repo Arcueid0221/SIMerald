@@ -35,12 +35,12 @@ async function submit() {
 
 <template>
   <div class="max-w-md mx-auto w-full">
-    <AdminSection title="站长登录" icon="tabler:lock" description="登录后可以看到完整号码和账号信息，并修改站点设置。">
+    <AdminSection title="站长登录" icon="tabler:lock">
       <form class="flex flex-col gap-4" @submit.prevent="submit">
         <FormField label="密码" for-id="login-password">
           <Input id="login-password" v-model="password" type="password" autocomplete="current-password" />
         </FormField>
-        <FormField label="验证码" for-id="login-code" help="手机验证器 App 上的 6 位数字；手机不在身边时可以填一个恢复码">
+        <FormField label="两步验证" for-id="login-code">
           <Input id="login-code" v-model="code" autocomplete="one-time-code" placeholder="123456" class="font-mono tracking-widest" />
         </FormField>
         <label class="flex items-center gap-2 text-sm text-muted-foreground">

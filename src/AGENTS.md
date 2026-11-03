@@ -36,7 +36,7 @@ When you need a new piece of UI:
 
 - Views orchestrate data already exposed by stores and utils.
 - `HomeView.vue` coordinates search, continent grouping, card-style selection, scroll restore, and route navigation.
-- Home cards live in `src/components/sim-card/`: `SimCardShell` (cut-corner shell + flag watermark + dark-mode glow), `ValidityRing`, `CarrierLogo`, `SimInfoRows`, and one component per card style (`SimCardNamecard` 名片, `SimCardBadge` 徽章, `SimCardDial` 表盘, `SimCardBar` 横条). `@/components/SimCard.vue` picks the style; shared display values come from `@/composables/useSimCardView`.
+- Home cards live in `src/components/sim-card/`: `SimCardShell` (cut-corner shell + flag watermark + dark-mode glow), `ValidityRing`, `CarrierLogo`, `SimInfoRows`, and one component per card style (`SimCardNamecard` 名片, `SimCardDial` 表盘, `SimCardBar` 横条). `@/components/SimCard.vue` picks the style; shared display values come from `@/composables/useSimCardView`.
 - `CardDetail.vue` shows one SIM card: metric cards, info sections and `RenewalHistory`.
 - `AdminView.vue` composes the panels in `src/components/admin/`.
 - Keep `HomeView` named with `defineOptions({ name: 'HomeView' })` so `App.vue`'s `KeepAlive :include="['HomeView']"` keeps working.

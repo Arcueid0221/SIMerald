@@ -35,7 +35,7 @@ There is no test suite. Verify with lint + type-check + build, and by running th
 
 ## Rules that matter
 
-- Privacy: anything not explicitly whitelisted in `server/view.ts` must never reach the public `/api/cards` response. Login-only fields: full number, device, services, account, payment accounts, data check, Notion URL, record titles and accounts
+- Privacy: anything not explicitly whitelisted in `server/view.ts` must never reach the public `/api/cards` response. Login-only fields: full number, card type, device, balance and its update date, services, account, payment accounts, data check, Notion URL, record titles and accounts
 - Server code must stay erasable-only TypeScript (no enums, no parameter properties, `.ts` extensions in relative imports) because Node strips types at runtime
 - Secrets (Notion token, password hash, TOTP secret) live only in the data directory or env vars, never in the repo
 - State-changing API calls require the `X-SIMerald-Request: 1` header

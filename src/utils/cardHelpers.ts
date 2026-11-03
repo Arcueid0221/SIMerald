@@ -196,7 +196,7 @@ export function formatCNY(amount: number, digits = 2): string {
 
 /** 余额够不够下一次保号：余额 ≥ 续费金额记 100% */
 export function getBalanceInfo(card: SimCard): { text: string, percent: number, status: BarStatus, sub: string } {
-  if (card.balance === null) {
+  if (card.balance == null) {
     return { text: '-', percent: 0, status: 'default', sub: '未记录余额' }
   }
   const updatedDays = daysSince(card.balanceUpdatedAt)
@@ -212,7 +212,7 @@ export function getBalanceInfo(card: SimCard): { text: string, percent: number, 
 
 export function isBalanceStale(card: SimCard): boolean {
   const days = daysSince(card.balanceUpdatedAt)
-  return card.balance !== null && days !== null && days > 90
+  return card.balance != null && days !== null && days > 90
 }
 
 /** 持有天数，以及距离下一个入手周年的进度 */

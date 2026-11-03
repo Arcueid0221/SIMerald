@@ -13,11 +13,6 @@ const props = defineProps<{ cardStyle: CardStyle }>()
       <circle cx="8" cy="6.2" r="2.2" />
       <path d="M5.5 11h5" />
     </template>
-    <template v-else-if="props.cardStyle === 'badge'">
-      <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
-      <circle cx="5.3" cy="8" r="1.9" />
-      <path d="M8.7 6.8h3.3M8.7 9.4h2.3" />
-    </template>
     <template v-else-if="props.cardStyle === 'dial'">
       <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
       <path d="M4 6.8h3.3M4 9.4h2.3" />

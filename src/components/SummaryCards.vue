@@ -93,6 +93,14 @@ const nextRenewal = computed(() => keptCards.value
   .map(card => ({ card, days: getRenewalDays(card) }))
   .filter((item): item is { card: SimCard, days: number } => item.days !== null)
   .sort((a, b) => a.days - b.days)[0] ?? null)
+const nextRenewalText = computed(() => {
+  if (!nextRenewal.value)
+    return null
+  const { days } = nextRenewal.value
+  if (days === 0)
+    return { value: '今天', unit: '' }
+  return days < 0 ? { value: -days, unit: '天前到期' } : { value: days, unit: '天后' }
+})
 
 // ==================== 价值 ====================
 const targetExchangeRate = computed(() => exchangeRates.value[exchangeRateBaseCurrency.value] || 1)
@@ -204,9 +212,7 @@ const cardGridClass = computed(() => showVisualPanel.value
               <span class="text-md md:text-2xl font-bold leading-none tracking-tight">
                 {{ activeCards.length }}
               </span>
-              <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">
-                / {{ summaryCards.length }} 张
-              </span>
+              <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">张</span>
             </div>
           </Transition>
         </div>
@@ -222,7 +228,7 @@ const cardGridClass = computed(() => showVisualPanel.value
       >
         <div class="flex h-full flex-col justify-between gap-1">
           <div class="flex items-start justify-between">
-            <span class="text-xs font-medium tracking-wider text-muted-foreground">覆盖国家</span>
+            <span class="text-xs font-medium tracking-wider text-muted-foreground">覆盖国家或地区</span>
             <Icon
               icon="tabler:world" :width="20" :height="20"
               class="text-slate-500/20 group-hover:text-slate-500 transition-colors"
@@ -234,9 +240,7 @@ const cardGridClass = computed(() => showVisualPanel.value
               :style="getMetricSwitchStyle(1)"
             >
               <span class="text-md md:text-2xl font-bold leading-none tracking-tight">{{ countryCount }}</span>
-              <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">
-                个国家/地区
-              </span>
+              <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">个</span>
             </div>
           </Transition>
         </div>
@@ -391,7 +395,7 @@ const cardGridClass = computed(() => showVisualPanel.value
       >
         <div class="flex h-full flex-col justify-between gap-1">
           <div class="flex items-start justify-between">
-            <span class="text-xs font-medium tracking-wider text-muted-foreground">即将续费</span>
+            <span class="text-xs font-medium tracking-wider text-muted-foreground">{{ UPCOMING_DAYS }} 天内续费</span>
             <Icon
               icon="tabler:calendar-due" :width="20" :height="20"
               class="text-slate-500/20 group-hover:text-slate-500 transition-colors"
@@ -407,7 +411,7 @@ const cardGridClass = computed(() => showVisualPanel.value
                 :style="getMetricSwitchStyle(4)"
               >
                 <span class="text-md md:text-2xl font-bold leading-none tracking-tight" :class="upcoming.length > 0 ? 'text-yellow-600 dark:text-yellow-400' : ''">{{ upcoming.length }}</span>
-                <span class="text-[11px] md:text-xs font-medium text-muted-foreground">张 · {{ UPCOMING_DAYS }} 天内</span>
+                <span class="text-[11px] md:text-xs font-medium text-muted-foreground">张</span>
               </div>
             </Transition>
           </DataTooltip>
@@ -424,7 +428,7 @@ const cardGridClass = computed(() => showVisualPanel.value
       >
         <div class="flex h-full flex-col justify-between gap-1">
           <div class="flex items-start justify-between">
-            <span class="text-xs font-medium tracking-wider text-muted-foreground">下次续费</span>
+            <span class="text-xs font-medium tracking-wider text-muted-foreground">即将续费</span>
             <Icon
               icon="tabler:hourglass" :width="20" :height="20"
               class="text-slate-500/20 group-hover:text-slate-500 transition-colors"
@@ -435,11 +439,11 @@ const cardGridClass = computed(() => showVisualPanel.value
               :key="`next-${summaryTransitionKey}`" class="flex items-baseline gap-1 min-w-0"
               :style="getMetricSwitchStyle(5)"
             >
-              <template v-if="nextRenewal">
+              <template v-if="nextRenewalText">
                 <span class="text-md md:text-2xl font-bold leading-none tracking-tight">
-                  {{ nextRenewal.days }}
+                  {{ nextRenewalText.value }}
                 </span>
-                <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">天 · {{ nextRenewal.card.name }}</span>
+                <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">{{ nextRenewalText.unit }}</span>
               </template>
               <span v-else class="text-md md:text-2xl font-bold leading-none tracking-tight">-</span>
             </div>

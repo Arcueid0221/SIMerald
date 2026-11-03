@@ -75,7 +75,6 @@ function isCardInGroup(card: SimCard, group: string): boolean {
 
 const CARD_STYLE_LABELS = {
   namecard: '名片',
-  badge: '徽章',
   dial: '表盘',
   bar: '横条',
 } as const
@@ -86,7 +85,7 @@ function isCardMatchSearch(card: SimCard, search: string): boolean {
   if (!search.trim())
     return true
   const lowerSearch = search.toLowerCase().trim()
-  const haystack = [card.name, card.carrier, card.countryName, card.type, card.device ?? '', card.last4, ...card.keepAlive]
+  const haystack = [card.name, card.carrier, card.countryName, card.type ?? '', card.device ?? '', card.last4, ...card.keepAlive]
   if (haystack.some(text => text.toLowerCase().includes(lowerSearch)))
     return true
   if (card.region && isRegionMatch(card.region, search))

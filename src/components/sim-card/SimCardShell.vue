@@ -5,7 +5,7 @@ import { useBackgroundSurface } from '@/composables/useBackgroundSurface'
 import { getFlagSrc } from '@/utils/regionHelper'
 
 /**
- * 四种卡片样式共用的外壳：左上角切掉一个角（SIM 卡的缺角），右下角是斜放的国旗水印。
+ * 三种卡片样式共用的外壳：左上角切掉一个角（SIM 卡的缺角），右下角是斜放的国旗水印。
  * 切角只裁背景层，内容层不裁，这样悬停提示可以伸出卡片。
  */
 

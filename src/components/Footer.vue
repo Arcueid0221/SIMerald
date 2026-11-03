@@ -34,7 +34,12 @@ const showFiling = computed(() => showIcp.value || showPolice.value)
           placement="top"
           :content="`v${buildVersion}\n${buildGitHash}`"
         >
-          <span class="font-medium text-foreground">SIMerald</span>
+          <a
+            href="https://github.com/BurningSky0306/simerald" target="_blank" rel="noopener noreferrer"
+            class="transition-opacity hover:opacity-80"
+          >
+            <span class="font-medium text-foreground">SIMerald</span>
+          </a>
         </DataTooltip>
         <span class="opacity-50 mx-1">·</span>
         <span>{{ syncedText }}</span>
