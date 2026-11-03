@@ -29,6 +29,9 @@ const MIME_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 }
 
+/** 只在 HTTPS 访问时发送：让浏览器一年内只用 HTTPS 打开本站（不含子域名，不加入预载列表） */
+const HSTS_VALUE = 'max-age=31536000'
+
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
@@ -374,6 +377,8 @@ function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string
 
 const server = createServer(async (req, res) => {
   const method = req.method ?? 'GET'
+  if (isHttps(req))
+    res.setHeader('Strict-Transport-Security', HSTS_VALUE)
 
   try {
     let url: URL
