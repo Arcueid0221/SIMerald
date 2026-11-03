@@ -17,7 +17,7 @@ const useCardsStore = defineStore('cards', () => {
   const totalCount = computed(() => cards.value.length)
   const activeCount = computed(() => cards.value.filter(c => c.status === 'active').length)
 
-  /** 分组 = 号码所在大洲，按固定顺序，只列出有号码的大洲 */
+  /** Continents that have at least one card, in `CONTINENTS` display order */
   const groups = computed<CardGroup[]>(() => {
     const present = new Set(cards.value.map(card => getContinent(card.region)))
     return CONTINENTS.filter(name => present.has(name)).map(name => ({ name, label: name }))

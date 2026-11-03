@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CardStyle } from '@/stores/app'
 
-/** 卡片样式切换按钮上的小图标：画的就是这种样式的版式缩略图 */
+/** Miniature layout icon for the card style switcher */
 
 const props = defineProps<{ cardStyle: CardStyle }>()
 </script>

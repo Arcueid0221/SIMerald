@@ -8,7 +8,7 @@ import { DataTooltip } from '@/components/ui/data-tooltip'
 import { useSimCardView } from '@/composables/useSimCardView'
 import { VALIDITY_TONE_TEXT } from '@/utils/cardHelpers'
 
-/** 横条：Logo 头像加一根有效期横条，最接近 Emerald 原版的排法 */
+/** Horizontal bar card layout, closest to the original Emerald server card */
 
 const props = defineProps<{ card: SimCard }>()
 

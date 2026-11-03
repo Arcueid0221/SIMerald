@@ -105,9 +105,9 @@ function clusterKey(c: RegionCluster) {
 }
 
 interface RegionSummary {
-  /** 该国家/地区在用的号码数 */
+  /** Active cards in this country/region */
   active: number
-  /** 最近一次续费还有几天 */
+  /** Days until nearest renewal */
   nearestDays: number | null
 }
 

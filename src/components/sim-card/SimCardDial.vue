@@ -9,7 +9,7 @@ import ValidityRing from '@/components/sim-card/ValidityRing.vue'
 import { DataTooltip } from '@/components/ui/data-tooltip'
 import { useSimCardView } from '@/composables/useSimCardView'
 
-/** 表盘：左边 Logo 头像，右边一个数字写在圈里的小表盘，正文三行虚线 */
+/** Dial card layout: header with a circular remaining-days gauge and dotted info rows */
 
 const props = defineProps<{ card: SimCard }>()
 
@@ -19,7 +19,7 @@ const emit = defineEmits<{
 
 const { daysClass, expiryRow, inactive, keepRow, purchaseRow, subtitle, validity, validityTooltip } = useSimCardView(() => props.card)
 
-/** 圈里只放得下数字：过期的卡显示 0，颜色和提示会说明情况 */
+/** The ring only fits a number; clamp negative days to 0 and rely on color/tooltip for expired state */
 const dialNumber = computed(() => {
   const left = validity.value.left
   return left === null ? '-' : String(Math.max(left, 0))

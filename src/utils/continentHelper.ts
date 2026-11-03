@@ -1,9 +1,10 @@
 import { getRegionCode } from '@/utils/regionHelper'
 
 /**
- * 首页分组：按号码所在大洲。
- * 跨洲的国家按常见习惯归：土耳其、高加索三国、哈萨克斯坦归亚洲，俄罗斯、塞浦路斯归欧洲；
- * 海外领地跟着地理位置走（比如加那利群岛归非洲，圣诞岛归大洋洲）。
+ * Continent grouping for the home view.
+ * Transcontinental countries follow common convention (Turkey, South Caucasus, and
+ * Kazakhstan under Asia; Russia and Cyprus under Europe); overseas territories are
+ * grouped by geographic location (e.g. Canary Islands under Africa, Christmas Island under Oceania).
  */
 
 export const CONTINENTS = ['亚洲', '欧洲', '北美洲', '南美洲', '非洲', '大洋洲', '南极洲', '其他'] as const
@@ -24,7 +25,7 @@ const CONTINENT_BY_CODE = new Map<string, Continent>(
     codes.split(' ').map(code => [code, continent as Continent] as const)),
 )
 
-/** 国旗 emoji → 大洲；认不出的地区归「其他」 */
+/** Map a flag emoji to its continent, falling back to `'其他'` if unrecognized */
 export function getContinent(regionEmoji: string): Continent {
   if (!regionEmoji)
     return '其他'

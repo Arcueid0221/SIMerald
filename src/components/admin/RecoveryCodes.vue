@@ -2,7 +2,7 @@
 import { Icon } from '@iconify/vue'
 import { Button } from '@/components/ui/button'
 
-/** 一次性恢复码：只显示这一次，手机丢了可以用它代替验证码登录 */
+/** One-time TOTP recovery codes, displayed only at generation time */
 const props = defineProps<{
   codes: string[]
 }>()

@@ -7,7 +7,7 @@ const baseCurrency = ref<CurrencyCode>('CNY')
 let loading: Promise<void> | null = null
 
 /**
- * 全站共享一份每日汇率，避免卡片墙、顶部卡片、详情页各自请求一次。
+ * Singleton daily exchange-rate state shared across the card wall, summary bar, and detail modal.
  */
 export function useExchangeRates() {
   if (!loading) {

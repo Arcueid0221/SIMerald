@@ -32,7 +32,7 @@ function parseMarkdown(text: string): Token[] {
   while (remaining.length > 0) {
     const imageMatch = remaining.match(IMAGE_REGEX)
     if (imageMatch) {
-      // 地址不安全时整张图片丢掉
+      // Drop the entire image if the URL is unsafe
       const url = safeUrl(imageMatch[2])
       if (url)
         tokens.push({ type: 'image', alt: imageMatch[1], url })
@@ -42,7 +42,7 @@ function parseMarkdown(text: string): Token[] {
 
     const linkMatch = remaining.match(LINK_REGEX)
     if (linkMatch) {
-      // 地址不安全时只显示文字，不生成链接
+      // Render as plain text if the URL is unsafe
       const url = safeUrl(linkMatch[2])
       tokens.push(url ? { type: 'link', content: linkMatch[1], url } : { type: 'text', content: linkMatch[1] })
       remaining = remaining.slice(linkMatch[0].length)

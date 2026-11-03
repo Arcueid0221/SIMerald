@@ -1,6 +1,6 @@
 /**
- * SIMerald 后端接口。
- * 所有修改类请求都带 X-SIMerald-Request 头，后端靠它防跨站请求伪造。
+ * SIMerald backend API client.
+ * State-changing requests send `X-SIMerald-Request` for CSRF protection.
  */
 import type { AdminStatus, CardsResponse, SiteInfo, ThemeSettings } from '@shared/types'
 

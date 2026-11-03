@@ -1,6 +1,5 @@
 import type { CardKind, NotionColor } from '@shared/types'
 
-/** 卡片类型图标：替代 Emerald 节点卡片上的操作系统图标 */
 const KIND_ICONS: Record<CardKind, string> = {
   physical: 'tabler:device-sim',
   adapter: 'tabler:device-sd-card',
@@ -15,7 +14,7 @@ const KIND_NAMES: Record<CardKind, string> = {
   virtual: '虚拟号码',
 }
 
-/** 沿用 Notion 里给卡片类型选项设置的颜色 */
+/** Maps Notion select-option colors to Tailwind text color classes */
 const COLOR_CLASSES: Record<NotionColor, string> = {
   default: 'text-slate-500',
   gray: 'text-slate-500',

@@ -49,12 +49,12 @@ function setExchangeRateBaseCurrency(event: Event): void {
   setBaseCurrency(financeHelper.normalizeCurrency(target.value))
 }
 
-// ==================== 号码 / 国家 ====================
+// ==================== Numbers & Countries ====================
 const activeCards = computed(() => summaryCards.value.filter(card => card.status === 'active'))
 const keptCards = computed(() => summaryCards.value.filter(card => card.status !== 'cancelled'))
 const countryCount = computed(() => new Set(keptCards.value.map(card => card.region || card.countryName).filter(Boolean)).size)
 
-// ==================== 累计花费 ====================
+// ==================== Total Spend ====================
 const spendBreakdown = computed(() => {
   let purchase = 0
   let renewal = 0
@@ -81,7 +81,7 @@ const spendTooltip = computed(() => [
   spendBreakdown.value.other > 0 ? `其他 ${formatCNY(spendBreakdown.value.other)}` : '',
 ].filter(Boolean).join('\n'))
 
-// ==================== 续费 ====================
+// ==================== Renewals ====================
 const upcoming = computed(() => keptCards.value
   .map(card => ({ card, days: getRenewalDays(card) }))
   .filter((item): item is { card: SimCard, days: number } => item.days !== null && item.days <= UPCOMING_DAYS)
@@ -102,7 +102,7 @@ const nextRenewalText = computed(() => {
   return days < 0 ? { value: -days, unit: '天前到期' } : { value: days, unit: '天后' }
 })
 
-// ==================== 价值 ====================
+// ==================== Valuation ====================
 const targetExchangeRate = computed(() => exchangeRates.value[exchangeRateBaseCurrency.value] || 1)
 const remainingValueCNY = computed(() => {
   return financeHelper.calculateTotalRemainingValueCNY(summaryCards.value, exchangeRates.value)

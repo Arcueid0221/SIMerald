@@ -3,7 +3,7 @@ import type { HTMLAttributes } from 'vue'
 import { computed, ref, watch } from 'vue'
 import { cn } from '@/lib/utils'
 
-/** 运营商 Logo；没有图片（或加载失败）时显示运营商名称的首字母 */
+/** Carrier logo with initials fallback when no image is set or loading fails */
 
 const props = defineProps<{
   carrier: string

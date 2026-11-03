@@ -11,8 +11,8 @@ import { useAppStore } from '@/stores/app'
 import { api, ApiError } from '@/utils/api'
 
 /**
- * 主题设置表单：按 shared/settings-schema.ts 自动生成，
- * 和 Komari 后台渲染 komari-theme.json 设置项的方式一样。
+ * Theme settings form generated from shared/settings-schema.ts,
+ * matching how Komari renders komari-theme.json fields.
  */
 const appStore = useAppStore()
 

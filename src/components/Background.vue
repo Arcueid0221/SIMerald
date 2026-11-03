@@ -10,7 +10,7 @@ const hasError = ref(false)
 const showBackground = computed(() => appStore.backgroundEnabled)
 const currentUrl = computed(() => showBackground.value ? appStore.currentBackgroundUrl : '')
 const backgroundType = computed(() => appStore.backgroundType)
-// 加引号，地址里有括号或引号也不会破坏 CSS
+// Quote the URL so parentheses or quotes in it cannot break CSS
 const backgroundImageCss = computed(() => `url(${JSON.stringify(currentUrl.value)})`)
 const hasCustomBackground = computed(() => showBackground.value && !!currentUrl.value)
 const showBackgroundOverlay = computed(() => hasCustomBackground.value && appStore.backgroundOverlay > 0)

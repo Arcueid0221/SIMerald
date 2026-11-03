@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { VALIDITY_TONE_TEXT } from '@/utils/cardHelpers'
 
-/** 有效期圆环：弧长 = 本期还剩几成，从正上方顺时针走；中间放 Logo 或天数 */
+/** Circular progress ring for remaining validity ratio, starting at 12 o'clock clockwise */
 
 const props = defineProps<{
   size: number
@@ -52,7 +52,7 @@ const arc = computed(() => Math.max(0, Math.min(1, props.ratio)) * circumference
 </template>
 
 <style>
-/* 不用 scoped：scoped 里写 :global(.dark) 前缀时，Vue 会把整条选择器换成 .dark，规则就落到了 <html> 上。这里的类名都带前缀，不会和别处冲突 */
+/* Unscoped: Vue's scoped CSS compiler strips the selector when using :global(.dark) as a prefix, applying rules to <html>. Classes are prefixed with .validity- to avoid collisions. */
 .validity-arc-animated {
   animation: validity-arc-in 1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
@@ -63,7 +63,6 @@ const arc = computed(() => Math.max(0, Math.min(1, props.ratio)) * circumference
   }
 }
 
-/* 深色模式的「夜光」：弧线带一点同色微光 */
 .dark .validity-arc {
   filter: drop-shadow(0 0 2px currentColor) drop-shadow(0 0 7px color-mix(in oklab, currentColor 55%, transparent));
 }

@@ -5,8 +5,8 @@ import { useBackgroundSurface } from '@/composables/useBackgroundSurface'
 import { getFlagSrc } from '@/utils/regionHelper'
 
 /**
- * 三种卡片样式共用的外壳：左上角切掉一个角（SIM 卡的缺角），右下角是斜放的国旗水印。
- * 切角只裁背景层，内容层不裁，这样悬停提示可以伸出卡片。
+ * Shared card shell with a SIM-style notched top-left corner and angled flag watermark.
+ * Only the background layers are clipped so tooltips in the content slot can overflow.
  */
 
 const props = defineProps<{ card: SimCard }>()
@@ -43,7 +43,7 @@ const flagSrc = computed(() => props.card.region ? getFlagSrc(props.card.region)
 </template>
 
 <style>
-/* 不用 scoped：scoped 里写 :global(.dark) 前缀时，Vue 会把整条选择器换成 .dark，规则就落到了 <html> 上。这里的类名都带前缀，不会和别处冲突 */
+/* Unscoped: Vue's scoped CSS compiler strips the selector when using :global(.dark) as a prefix, applying rules to <html>. Classes are prefixed with .sim- to avoid collisions. */
 .sim-shell-glow {
   transition: filter 0.2s;
 }
@@ -55,7 +55,7 @@ const flagSrc = computed(() => props.card.region ? getFlagSrc(props.card.region)
   transition: background-color 0.2s;
 }
 
-/* 内层切角多 0.4px，让斜边的描边和直边一样粗 */
+/* Offset inner cut by 0.4px so the diagonal border matches the 1px straight edges */
 .sim-shell-face {
   clip-path: polygon(16.4px 0, 100% 0, 100% 100%, 0 100%, 0 16.4px);
   border-radius: calc(var(--radius) - 3px);
@@ -112,7 +112,7 @@ const flagSrc = computed(() => props.card.region ? getFlagSrc(props.card.region)
   filter: grayscale(1);
 }
 
-/* 深色模式：卡面比页面亮一档、平时就有极细的描边（看得见切角），悬停变亮；国旗往卡片中间渐隐，不压字 */
+/* Dark mode: slightly lifted card surface, subtle resting border to keep the notch visible, and faded flag watermark */
 .dark .sim-shell-face {
   background-color: color-mix(in oklab, var(--card) 66%, transparent);
 }

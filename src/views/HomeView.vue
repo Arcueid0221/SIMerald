@@ -107,7 +107,7 @@ const cardList = computed(() => {
   const sorted = sortCards(filtered, appStore.defaultSort)
   if (!appStore.cancelledLast)
     return sorted
-  // 稳定排序：已注销的号码放到最后，其余保持原有顺序
+  // Rely on stable sort to move cancelled cards to the end while preserving relative order
   return [...sorted].sort((a, b) => Number(a.status === 'cancelled') - Number(b.status === 'cancelled'))
 })
 

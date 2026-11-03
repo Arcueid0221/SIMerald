@@ -100,7 +100,6 @@ const metricCards = computed<MetricCard[]>(() => {
 
 const numberInfo = computed<InfoItem[]>(() => {
   const card = data.value
-  // 卡片类型和使用设备只给站长看
   const locked = !cardsStore.full
   const lockedValue = '登录后可见'
   return [
@@ -125,7 +124,6 @@ const balanceInfo = computed<InfoItem[]>(() => {
   const card = data.value
   if (!card)
     return []
-  // 余额只给站长看
   const locked = !cardsStore.full
   const lockedValue = '登录后可见'
   const hold = getHoldInfo(card)

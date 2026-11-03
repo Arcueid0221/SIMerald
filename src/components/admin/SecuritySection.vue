@@ -137,7 +137,7 @@ function logoutOthers() {
         </Button>
       </div>
 
-      <!-- 已经拿到新的恢复码 -->
+      <!-- Newly generated recovery codes -->
       <div v-if="recoveryCodes.length" class="flex flex-col gap-3">
         <RecoveryCodes :codes="recoveryCodes" />
         <div>
@@ -147,7 +147,7 @@ function logoutOthers() {
         </div>
       </div>
 
-      <!-- 第二步：扫描新的二维码 -->
+      <!-- Rebind step 2: scan new QR code -->
       <form v-else-if="mode === 'rebind' && enrollment" class="flex flex-col gap-4" @submit.prevent="finishRebind">
         <TotpQr :uri="enrollment.uri" :secret="enrollment.secret" />
         <FormField label="新 App 上显示的 6 位数字" for-id="sec-new-code">
@@ -166,7 +166,7 @@ function logoutOthers() {
         </div>
       </form>
 
-      <!-- 需要先确认身份的操作 -->
+      <!-- Step 1: verify current password and 2FA code -->
       <form
         v-else-if="mode !== 'idle'" class="flex flex-col gap-4 max-w-md"
         @submit.prevent="mode === 'password' ? changePassword() : mode === 'rebind' ? beginRebind() : regenerate()"

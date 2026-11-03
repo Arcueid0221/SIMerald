@@ -168,7 +168,7 @@ export function setStoredFinanceCurrency(currency: CurrencyCode): void {
   setLocalStorageItem('fin_currency', currency)
 }
 
-/** 计入价值统计的卡：已注销的不算；免费保号的卡价格为 0，本来就不影响结果 */
+/** Exclude cancelled cards from value totals; free-retention cards have price 0 and do not affect results */
 function countable(card: SimCard): boolean {
   return card.status !== 'cancelled'
 }
@@ -234,7 +234,7 @@ export function calculateRemainingValueCNY(
   if (priceCNY <= 0)
     return 0
 
-  // 有效期至当天仍可用，按当天结束计算
+  // Expiry date is inclusive through the end of that day
   const expiredAt = new Date(`${expiry}T23:59:59`).getTime()
   if (!Number.isFinite(expiredAt))
     return 0

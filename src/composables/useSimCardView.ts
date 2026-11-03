@@ -12,21 +12,20 @@ import {
   VALIDITY_TONE_TEXT,
 } from '@/utils/cardHelpers'
 
-/** 卡片上「标签 ······ 数值」的一行 */
+/** Key-value row rendered on a SIM card */
 export interface SimInfoRow {
   label: string
   value: string
   tooltip?: string
 }
 
-/** 三种卡片样式共用的展示数据 */
+/** Shared display state for all three SIM card layout variants */
 export function useSimCardView(getCard: () => SimCard) {
   const { rates } = useExchangeRates()
 
   const card = computed(getCard)
   const validity = computed(() => getValidity(card.value))
   const daysText = computed(() => getValidityDaysText(validity.value))
-  /** 剩得不到一半时数字跟着变色（深色模式下还会微微发光） */
   const daysClass = computed(() => validity.value.hot ? `${VALIDITY_TONE_TEXT[validity.value.tone]} sim-glow-text` : '')
   const validityTooltip = computed(() => getValidityTooltip(card.value, validity.value))
 

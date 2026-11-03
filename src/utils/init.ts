@@ -1,7 +1,7 @@
 /**
- * 应用初始化：拉取站点信息和卡片数据。
- * 数据每天才同步一次，所以不需要 Komari 那样的 WebSocket 实时推送；
- * 页面停留期间每 10 分钟、或者切回标签页时检查一次即可。
+ * App initialization: fetches site metadata and card data.
+ * Because Notion sync runs once daily, polling every 10 minutes while visible
+ * and refreshing on tab focus is sufficient.
  */
 
 import { watch } from 'vue'
@@ -28,7 +28,7 @@ export async function refreshData(): Promise<void> {
     lastRefreshAt = Date.now()
   }
   catch (error) {
-    console.error('[init] 拉取数据失败:', error)
+    console.error('[init] Failed to fetch data:', error)
     appStore.connectionError = true
     throw error
   }

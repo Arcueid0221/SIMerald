@@ -7,7 +7,7 @@ import ValidityRing from '@/components/sim-card/ValidityRing.vue'
 import { DataTooltip } from '@/components/ui/data-tooltip'
 import { useSimCardView } from '@/composables/useSimCardView'
 
-/** 名片：圆环套 Logo 居中，下面是名字、号码和三格数字 */
+/** Vertical namecard layout: centered logo inside a validity ring with a 3-column footer */
 
 const props = defineProps<{ card: SimCard }>()
 

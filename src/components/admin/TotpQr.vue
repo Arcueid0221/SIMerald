@@ -4,7 +4,6 @@ import { renderSVG } from 'uqr'
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 
-/** 两步验证二维码：手机验证器 App 扫码；扫不了时可以手动输入下面的密钥 */
 const props = defineProps<{
   uri: string
   secret: string
@@ -28,7 +27,7 @@ async function copySecret() {
 
 <template>
   <div class="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
-    <!-- 二维码由本地生成，不经过任何第三方 -->
+    <!-- QR SVG is rendered locally via uqr without external requests -->
     <div class="size-44 shrink-0 rounded-md bg-white p-1 [&>svg]:size-full" v-html="svg" />
     <div class="flex flex-col gap-2 min-w-0 text-xs text-muted-foreground leading-relaxed">
       <p>用手机上的验证器 App（Google Authenticator、Microsoft Authenticator、1Password 等）扫描左边的二维码。</p>

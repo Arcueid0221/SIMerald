@@ -3,7 +3,7 @@ import type { ExchangeRates } from '@/utils/financeHelper'
 import dayjs from 'dayjs'
 import { CURRENCY_SYMBOLS, normalizeCurrency } from '@/utils/financeHelper'
 
-/** 和 Emerald 一致的到期阈值：7 天内红色，15 天内黄色 */
+/** Expiry thresholds matching Emerald: <7 days critical (red), <15 days warning (yellow) */
 const CRITICAL_DAYS = 7
 const WARNING_DAYS = 15
 const LONG_TERM_DAYS = 36500
@@ -16,7 +16,7 @@ function today() {
   return dayjs().startOf('day')
 }
 
-/** 距离某个日期还有几天（按自然日算），日期为空返回 null */
+/** Calendar days until `date`, or `null` if empty or invalid */
 export function daysUntil(date: string | null | undefined): number | null {
   if (!date)
     return null
@@ -63,10 +63,10 @@ export function getRenewalTextClass(card: SimCard): string {
   return ''
 }
 
-/** 有效期分档：按「本期还剩几成」算，每张卡只和自己的续费周期比 */
+/** Validity tier based on the fraction of the current billing cycle remaining */
 export type ValidityTone = 'critical' | 'urgent' | 'warning' | 'fair' | 'good' | 'none'
 
-/** 各档的文字颜色；圆环和横条用 currentColor 跟着它走 */
+/** Text color classes per validity tier; rings and progress bars inherit via `currentColor` */
 export const VALIDITY_TONE_TEXT: Record<ValidityTone, string> = {
   critical: 'text-destructive',
   urgent: 'text-orange-500',
@@ -77,14 +77,14 @@ export const VALIDITY_TONE_TEXT: Record<ValidityTone, string> = {
 }
 
 export interface ValidityInfo {
-  /** 距离有效期末还有几天；没有有效期记录或已注销时为 null */
+  /** Days until expiry, or `null` if unrecorded or cancelled */
   left: number | null
-  /** 本期总天数：本期开始日到有效期末 */
+  /** Total days in the current cycle (period start to expiry) */
   total: number
-  /** 本期还剩几成，0 ~ 1 */
+  /** Remaining fraction of the current cycle, clamped to 0..1 */
   ratio: number
   tone: ValidityTone
-  /** 剩得不到一半时，天数跟着变色 */
+  /** Whether <=50% of the cycle remains, triggering colored day-count text */
   hot: boolean
 }
 
@@ -105,7 +105,7 @@ export function getValidity(card: SimCard): ValidityInfo {
   return { left, total, ratio, tone, hot: ratio <= 0.5 }
 }
 
-/** 剩余天数的数字部分（单位「天」由界面补上） */
+/** Numeric portion of remaining days (the "天" unit is rendered separately by the UI) */
 export function getValidityDaysText(validity: ValidityInfo): string {
   if (validity.left === null)
     return '-'
@@ -126,9 +126,9 @@ export function isPurchaseRecord(record: SimRecord): boolean {
 }
 
 export interface PurchaseInfo {
-  /** 首次购买那笔的人民币金额 */
+  /** Initial purchase amount in CNY */
   cny: number | null
-  /** 原币种金额，如 €4.14 */
+  /** Formatted amount in original currency, e.g. `€4.14` */
   original: string | null
   date: string | null
 }
@@ -147,15 +147,15 @@ export function getPurchase(card: SimCard): PurchaseInfo {
 }
 
 export interface KeepCostInfo {
-  /** 卡片上的短写法：¥243 / 免费 / 不固定 */
+  /** Compact label for cards: `¥243` / `免费` / `不固定` */
   short: string
-  /** 带单位的写法：¥243/年 / 免费保号 / 周期不固定 */
+  /** Label with unit: `¥243/年` / `免费保号` / `周期不固定` */
   long: string
-  /** 悬停提示：原币种续费价 + 保号方式 */
+  /** Tooltip with original-currency renewal price and keep-alive method */
   tooltip: string
 }
 
-/** 每年保号花多少钱（人民币估算）；已注销的卡也照常算，界面上会盖住 */
+/** Estimated annual keep-alive cost in CNY; computed even for cancelled cards (masked by the UI) */
 export function getKeepCost(card: SimCard, rates: ExchangeRates): KeepCostInfo {
   const how = card.keepAlive.join('、') || '未记录保号方式'
   if (card.cycleDays <= 0)
@@ -194,7 +194,7 @@ export function formatCNY(amount: number, digits = 2): string {
   return `¥${new Intl.NumberFormat('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount)}`
 }
 
-/** 余额够不够下一次保号：余额 ≥ 续费金额记 100% */
+/** Balance sufficiency for the next renewal; 100% when balance >= renewal price */
 export function getBalanceInfo(card: SimCard): { text: string, percent: number, status: BarStatus, sub: string } {
   if (card.balance == null) {
     return { text: '-', percent: 0, status: 'default', sub: '未记录余额' }
@@ -215,7 +215,7 @@ export function isBalanceStale(card: SimCard): boolean {
   return card.balance != null && days !== null && days > 90
 }
 
-/** 持有天数，以及距离下一个入手周年的进度 */
+/** Days held and percentage progress toward the next purchase anniversary */
 export function getHoldInfo(card: SimCard): { days: number | null, percent: number, sub: string } {
   const days = daysSince(card.firstPurchaseAt)
   if (days === null || days < 0)

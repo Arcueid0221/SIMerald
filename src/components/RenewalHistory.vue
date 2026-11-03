@@ -10,12 +10,12 @@ import { formatAmount, formatCNY } from '@/utils/cardHelpers'
 import '@/utils/echarts'
 
 /**
- * 续费历史：替代 Emerald 详情页的负载 / Ping 图表。
- * 上面是按消费日期的柱状图（等额人民币），下面是逐笔明细。
+ * Renewal history for the detail page, replacing Emerald's load / ping charts:
+ * a bar chart of spend (CNY) by date, followed by the itemized records.
  */
 const props = defineProps<{
   card: SimCard
-  /** 在弹窗里使用时不需要外层卡片背景 */
+  /** Omit the outer card background when rendered inside a dialog */
   plain?: boolean
 }>()
 

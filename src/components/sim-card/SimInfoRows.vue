@@ -2,7 +2,7 @@
 import type { SimInfoRow } from '@/composables/useSimCardView'
 import { DataTooltip } from '@/components/ui/data-tooltip'
 
-/** Emerald 原版那种「标签 ······ 数值」的虚线清单 */
+/** Key-value rows connected by a dotted leader line, styled after Emerald */
 
 const props = defineProps<{ rows: SimInfoRow[] }>()
 </script>

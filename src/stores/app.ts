@@ -48,7 +48,7 @@ const useAppStore = defineStore('app', () => {
   // 首页滚动位置记忆
   const homeScrollPosition = ref<number>(0)
 
-  // 访客自己选过的卡片样式；null 表示没选过，跟随站长设置的默认样式
+  // Visitor-selected card style; null falls back to the site default
   const storedCardStyle = useStorageAsync<CardStyle | null>('cardStyle', null, localStorage)
 
   const defaultCardStyle = computed<CardStyle>(() => {
@@ -56,7 +56,6 @@ const useAppStore = defineStore('app', () => {
     return isValidCardStyle(style) ? style : 'namecard'
   })
 
-  // 当前实际使用的卡片样式
   const cardStyle = computed<CardStyle>({
     get: () => isValidCardStyle(storedCardStyle.value) ? storedCardStyle.value : defaultCardStyle.value,
     set: (val) => {
@@ -64,7 +63,6 @@ const useAppStore = defineStore('app', () => {
     },
   })
 
-  // 计算属性：默认排序方式
   const defaultSort = computed<SortMode>(() => {
     const settings = publicSettings.value?.theme_settings
     const mode = settings?.defaultSort
@@ -137,7 +135,6 @@ const useAppStore = defineStore('app', () => {
     return false
   })
 
-  // 计算属性：已注销后置（默认顺序下已注销的号码排到最后）
   const cancelledLast = computed<boolean>(() => {
     const settings = publicSettings.value?.theme_settings
     if (settings && typeof settings.cancelledLast === 'boolean') {
