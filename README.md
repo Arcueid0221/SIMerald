@@ -2,69 +2,102 @@
 
 # SIMerald
 
-**把 Notion 里的 SIM / eSIM 收藏，做成一面可以公开展示的卡片墙。**
+**Turn a SIM / eSIM collection kept in Notion into a public card-wall website.**
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.webp">
-  <img src="docs/screenshot-light.webp" alt="SIMerald 首页（演示数据）" width="100%">
+  <img src="docs/screenshot-light.webp" alt="SIMerald home page (demo data)" width="100%">
 </picture>
+
+English | [简体中文](README.zh-CN.md)
 
 </div>
 
-SIMerald 改自 [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald) 主题。地球、统计卡、卡片墙和深色模式都还在，只是把 VPS 的 CPU、内存和流量，换成了 SIM 卡的有效期、保号成本和续费记录。
+SIMerald is a self-hosted web application that displays a personal SIM and eSIM collection synced from Notion. It is a fork of the [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald) theme, adapting its globe, summary cards, card wall, and dark mode from VPS monitoring to SIM card validity tracking, keep-alive costs, and renewal history. The web interface is in Simplified Chinese only (there is no i18n).
 
-## 特性
+## Features
 
-- **三种卡片样式**：名片、表盘、横条，访客在右上角自选
-- **有效期圆环**：按本期还剩几成着色，每张卡只和自己的续费周期比
-- **地球与统计**：按国家落点；在用号码、覆盖国家、即将续费、累计花费一屏看完
-- **公开但打码**：访客只看到号码后 4 位；完整号码、使用设备、账号等字段在后端就被滤掉
-- **只读 Notion**：每天自动同步一次，也能手动同步，从不改动 Notion 里的内容
-- **网页后台**：密码加两步验证登录；主题、公告、同步时间、字段映射都在后台设置
+- **Three card styles**: Namecard (`namecard`), Dial (`dial`), and Bar (`bar`). Visitors can switch styles in the top-right corner, and the default style is configurable in the admin panel.
+- **Validity ring**: Colored by the remaining percentage of the current cycle, comparing each card against its own renewal cycle.
+- **Interactive globe and summary metrics**: Plots cards by country on an interactive 3D globe or dotted map, alongside summary cards for active numbers, covered countries, renewals due within 30 days, next renewal, total spend, and remaining value.
+- **Server-side privacy masking**: Visitors see only the last 4 digits of each phone number. Sensitive fields (full numbers, exact card types, devices, balances, bound services, management accounts, payment accounts, data check notes, Notion URLs, and record titles) are stripped on the backend before responses leave the server.
+- **Read-only Notion sync**: Syncs once a day on a configurable schedule and supports manual sync on demand. SIMerald only reads from Notion and never modifies your databases.
+- **Built-in admin panel**: A single owner account signs in with a password (scrypt) and TOTP two-factor authentication, with web-based configuration for theme settings, announcements, sync schedule, and Notion field mapping.
 
-## 部署
+## Deployment
+
+Clone the repository and start the container with Docker Compose:
 
 ```bash
-git clone https://github.com/BurningSky0306/simerald.git
-cd simerald/deploy
+git clone https://github.com/BurningSky0306/SIMerald.git
+cd SIMerald/deploy
 mkdir -p data && sudo chown 1000:1000 data
 docker compose up -d --build
 ```
 
-服务只监听 `127.0.0.1:25780`，用 Caddy、Nginx 或 Cloudflare Tunnel 对外提供 HTTPS。按你用的反向代理设置 `deploy/compose.yaml` 里的 `TRUST_PROXY`（`cloudflare` / `xff` / `none`），登录输错按 IP 锁定才准确。
+By default, `deploy/compose.yaml` binds the service to `127.0.0.1:25780` and runs inside the container as UID `1000` with `/data` mounted from `./data`. Expose it over HTTPS using a reverse proxy (such as Caddy or Nginx) or Cloudflare Tunnel.
 
-1. 在 `docker logs simerald` 里找到首次设置密钥（也存在 `data/setup-key.txt`）
-2. 打开 `/admin`，设置密码、绑定两步验证、保存恢复码
-3. 在后台「Notion 连接」填入 token 和数据库链接，保存后立即同步
+Set `TRUST_PROXY` in `deploy/compose.yaml` (`cloudflare`, `xff`, or `none`) to match your reverse proxy setup so IP-based login rate limiting sees the real client IP. See [`docs/configuration.md`](docs/configuration.md) for environment variable and proxy configuration details.
 
-> 数据目录里有密码哈希、两步验证密钥和 Notion token。记得备份，别提交到 Git。
+> The data directory stores the password hash, TOTP secret, Notion token, settings, and cached card data. Back it up regularly and never commit it to Git.
 
-## 接入 Notion
+## First-Time Setup
 
-需要两个数据库：**SIM 卡**（一张卡一行）和**消费记录**（开卡、续费、充值各记一笔，用关联字段指向 SIM 卡）。**扣款账户**数据库可选。
+1. Retrieve the one-time setup key from the container log (`docker logs simerald`) or from `data/setup-key.txt`.
+2. Open `https://sim.example.com/admin` in your browser.
+3. Enter the setup key, set the owner password, bind a TOTP authenticator app, and save the generated one-time recovery codes.
+4. Until a Notion token is configured, SIMerald runs in demo mode and displays built-in sample data.
 
-1. 在 [Notion integrations](https://www.notion.so/profile/integrations) 新建 Internal integration，只给「读取内容」权限
-2. 在数据库所在页面点 `···` →「连接」，选中它
-3. 把 token 和数据库链接填进后台
+## Connecting Notion
 
-默认列名见 [`server/mapping.ts`](server/mapping.ts)，对不上就在后台「字段映射」里改。有效期、号码状态这类列可以是公式。也可以不在后台填，改用环境变量 `NOTION_TOKEN`、`NOTION_CARDS_DB`、`NOTION_RECORDS_DB`、`NOTION_ACCOUNTS_DB`。
+SIMerald reads from two required Notion databases and one optional database:
 
-## 运营商 Logo
+- **SIM Cards** (required): One row per SIM or eSIM card.
+- **Expense Records** (required): One row per initial purchase, renewal, or top-up, linked to the SIM Cards database via a relation property.
+- **Payment Accounts** (optional): Linked from SIM Cards and Expense Records to display payment account names when signed in.
 
-把图片放进数据目录的 `logos/`，文件名写运营商名称，比如 `Harbour Mobile.png`（大小写、空格和标点不敏感，支持 png / webp / jpg / svg）。没有图片的卡显示首字母。Logo 不进仓库。
+To connect your workspace:
 
-## 开发
+1. Create an internal integration at [Notion Integrations](https://www.notion.so/profile/integrations) with **Read content** permission only.
+2. Open each database page in Notion, click the `•••` menu, select **Connections**, and grant access to your integration.
+3. In the `/admin` panel under the Notion connection tab, enter the integration token and the database IDs or page URLs, then save to trigger an immediate sync. You can also supply `NOTION_TOKEN`, `NOTION_CARDS_DB`, `NOTION_RECORDS_DB`, and `NOTION_ACCOUNTS_DB` via environment variables.
+
+If your database column names differ from the defaults in [`server/mapping.ts`](server/mapping.ts), customize the JSON mapping in the admin panel. For the complete list of fields, formulas, and calculation rules, see [`docs/configuration.md`](docs/configuration.md).
+
+## Carrier Logos
+
+Place carrier logo images in the `logos/` subdirectory inside the data directory (for example, `data/logos/Harbour Mobile.png`).
+
+- Supported formats: `.png`, `.webp`, `.jpg`, `.jpeg`, `.svg`.
+- File names are matched against the carrier name with case, spaces, punctuation, and symbols ignored (for example, `Harbour Mobile.png` and `harbour-mobile.webp` both match `Harbour Mobile`).
+- Cards without a matching image display the carrier's initial.
+- Directory listings are cached for one minute; replaced files take effect automatically with cache-busting query strings.
+
+## Development
+
+Requires Node.js `>= 22.18.0`. The backend runs TypeScript directly via Node's built-in type stripping without a separate build step or runtime dependencies.
 
 ```bash
 npm install
-npm run dev:server   # 后端；没有 Notion token 时使用演示数据
-npm run dev          # 前端；/api 转发到后端
+npm run dev:server   # Backend on :25780 (uses demo data when no Notion token is set)
+npm run dev          # Vite dev server, proxies /api to the backend
 ```
 
-提交前跑一遍 `npx eslint .`、`npm run type-check` 和 `npm run build-only`。
+Before committing changes, run the linter, type checker, and production build:
 
-## 致谢
+```bash
+npx eslint .
+npm run type-check
+npm run build-only
+```
 
-界面改自 [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald)（MIT，Tokinx），灵感来自 [Komari Monitor](https://github.com/komari-monitor/komari)，国旗来自 [Twemoji](https://github.com/jdecked/twemoji)（CC-BY 4.0）。
+For codebase architecture and conventions, see [`AGENTS.md`](AGENTS.md), [`src/AGENTS.md`](src/AGENTS.md), and [`docs/design.md`](docs/design.md).
 
-由 [BurningSky0306](https://github.com/BurningSky0306) 和 [Claude](https://claude.com/claude-code) 一起完成，以 [MIT](LICENSE) 协议发布。
+## Credits
+
+- UI derived from [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald) (MIT, Tokinx), inspired by [Komari Monitor](https://github.com/komari-monitor/komari)
+- Country flag graphics from [Twemoji](https://github.com/jdecked/twemoji) (CC-BY 4.0)
+
+## Authors and License
+
+Built by [BurningSky0306](https://github.com/BurningSky0306), **Claude Opus 5.5** and **Gemini 4 Argon**. Released under the [MIT](LICENSE) license.

@@ -1,0 +1,61 @@
+# Design Notes
+
+SIMerald adapts the [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald) server monitoring theme into a standalone web application for displaying a personal SIM and eSIM collection backed by Notion.
+
+## Core Design Decisions
+
+1. **Standalone application**: SIMerald does not depend on Komari Monitor. It includes its own zero-dependency Node.js backend (`server/`) that syncs from Notion, manages authentication and settings, and serves the compiled frontend (`src/`).
+2. **Fork of Komari Emerald**: Rather than building a new UI from scratch, the frontend preserves Emerald's layout, 3D globe, summary cards, animations, color tokens, rounded corners, and dark mode, changing only the domain-specific views and data models.
+3. **Read-only Notion data source with local caching**: Notion serves as the editing interface and formula engine. SIMerald queries the Notion API (version `2025-09-03`) once per day (plus manual triggers) and writes the normalized cards to `cache.json`. Visitor requests read from memory/disk cache so page loads are fast and never hit Notion rate limits.
+4. **Configurable field mapping**: Default column names in `server/mapping.ts` match the default Chinese Notion schema, while `mergeMapping()` allows users to remap every column name and status value in JSON without changing code.
+5. **Single-owner web admin panel**: Replaces Komari's host-level theme configuration with a built-in `/admin` view driven by `shared/settings-schema.ts`, which provides a single source of truth for both backend validation (`sanitizeSettings`) and frontend form rendering.
+6. **Local-only binding in Docker**: The container is designed to bind to `127.0.0.1:25780` behind a reverse proxy or Cloudflare Tunnel, running as an unprivileged user (`node`, UID `1000`) with all Linux capabilities dropped (`cap_drop: ALL`) and `no-new-privileges:true`.
+7. **Built-in demo mode**: When no Notion token is configured, the server returns deterministic fictional card data (`server/demo.ts`) so the UI works out of the box for evaluation and frontend development.
+
+## Mapping Komari Emerald Concepts to SIM Cards
+
+VPS instances and SIM cards share similar lifecycle attributes: recurring billing cycles, renewal dates, multi-currency pricing, and geographic regions. SIMerald maps Emerald's UI components to SIM concepts as follows:
+
+| Komari Emerald Component                           | SIMerald Adaptation                                                                                                                                               |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Header rotating 3D globe / static globe / map      | Retained. Plots flag markers by card country, showing active card count and days until the earliest upcoming renewal in that country.                             |
+| Header summary cards (RAM, disk, traffic, speed)   | Replaced with: Active Numbers, Covered Countries, Total Spend, Renewing Soon (within 30 days), and Next Renewal.                                                  |
+| Remaining Value card (toggles total / monthly)     | Reused directly (`financeHelper`), fed by each card's renewal `price`, `currency`, and `cycleDays`.                                                               |
+| Daily Exchange Rate card (switchable base)         | Reused directly for live currency conversion in the browser; historical spend uses the transaction-time CNY value from Notion.                                    |
+| Free-tier ("白嫖中") badge                         | Applied to cards whose renewal `price` is `0`; excluded from portfolio value calculations.                                                                        |
+| Server group tabs                                  | Grouped automatically by continent (`@/utils/continentHelper`) based on the card's country; only continents with at least one card are listed.                    |
+| Search bar                                         | Matches card name, carrier, country or region, last 4 digits and keep-alive actions; for the signed-in owner also card type, device and full number.              |
+| Card / table view switcher                         | Table view removed. Visitors switch among three SIM card layouts: Namecard (`SimCardNamecard`), Dial (`SimCardDial`), and Bar (`SimCardBar`).                     |
+| OS icon on node card                               | Replaced with carrier logo served from `<DATA_DIR>/logos/` (`CarrierLogo`), falling back to the carrier's initial.                                                |
+| Node card shell                                    | Top-left corner is clipped like a physical SIM card (`SimCardShell`), with the country flag rendered as a tilted bottom-right watermark.                          |
+| Online / offline status indicator                  | Mapped to `active` (green, `使用中`), `expired` (red, `已过期`), and `cancelled` (gray, `已注销`).                                                                |
+| "Offline nodes last" toggle                        | Replaced with "Cancelled numbers last" (`cancelledLast`).                                                                                                         |
+| CPU / RAM / disk / traffic gauges                  | Replaced with a validity ring (`ValidityRing`, or horizontal bar in Bar style) colored by the remaining fraction of the card's own cycle, plus days left.         |
+| Network rate / uptime / billing / carrier rows     | Replaced with `•••• last4`, country, expiration date, initial purchase price, and yearly keep-alive cost (with hover tooltip for original currency & keep-alive). |
+| Latency / packet-loss mini grid                    | Removed.                                                                                                                                                          |
+| Dark mode                                          | Elevated card surface with subtle border, matching-hue glow on validity rings/bars, and faded flag watermark; defaults to system preference (`auto`).             |
+| Detail page financial summary cards                | Reused for renewal price, monthly cost, remaining time, and remaining value.                                                                                      |
+| Detail page hardware / OS / storage / network      | Replaced with Number Info, Keep-Alive Info, Balance Info (owner only, alerts when balance update is over 90 days old), and Account Info (owner only).             |
+| Detail page load and ping charts                   | Replaced with `RenewalHistory` (bar chart + itemized transaction list).                                                                                           |
+| Announcement banner, visitor card, ICP, background | Retained and configured through `shared/settings-schema.ts`.                                                                                                      |
+| Top-bar Admin entry                                | Opens login modal/view when logged out (can be hidden via `hideAdminEntryWhenLoggedOut`) and opens the settings panel when signed in.                             |
+
+## Privacy and Security Model
+
+- **Backend whitelist masking (`server/view.ts`)**: Public API responses pass through `toPublicCard()` and `publicRecord()`, which construct a new object containing only explicitly whitelisted fields. Unauthenticated responses never contain full phone numbers (`number`), full card type strings (`type`), devices (`device`), balances (`balance`, `balanceUpdatedAt`), bound services (`services`), management accounts (`account`), payment accounts (`paymentAccounts`, record `accounts`), data check warnings (`dataCheck`), Notion URLs (`notionUrl`), or expense record titles (`title`). If new fields are added to `SimCard` in the future, they remain private unless explicitly added to `server/view.ts`.
+- **Authenticated responses**: When the owner is signed in with a valid session cookie, `/api/cards` returns the unmasked `SimCard[]` objects from the same endpoint, and the frontend reveals owner-only sections on the detail page.
+- **Opaque identifiers (`server/cards.ts`)**: Notion page UUIDs are hashed with `HMAC-SHA256` using a per-instance random `idKey` (`opaqueId`) so public URLs (`/card/:id`) and API payloads do not leak Notion page IDs.
+- **Single-owner authentication (`server/auth.ts`)**:
+  - Initial setup requires a one-time setup key generated on the server (`data/setup-key.txt` and container logs) to prevent unauthorized initialization.
+  - Sign-in requires both the password (hashed with `scrypt`) and a TOTP code (or a one-time recovery code).
+  - "Remember this device for 30 days" sets an `HttpOnly`, `Secure`, `SameSite=Strict` session cookie.
+  - Failed login attempts are rate-limited per client IP (5 failures lock the IP for 15 minutes) and globally (20 failures within 15 minutes lock sign-in globally).
+- **CSRF protection**: All state-changing API requests require the custom `X-SIMerald-Request: 1` header, enforced by the backend and automatically attached by `@/utils/api`.
+- **Secret isolation**: Notion tokens, password hashes, TOTP secrets, and session keys reside only in `DATA_DIR` or environment variables. When the admin panel queries Notion connection settings, the saved token is never returned to the browser.
+
+## Intentionally Out of Scope
+
+- **Renewal reminders and push notifications**: SIMerald is a display wall; expiration alerts and notifications (such as Telegram bots or email reminders) are left to Notion automations or external tools.
+- **Writing back to Notion**: SIMerald is strictly read-only. Adding cards, logging renewals, or editing balances is done directly in Notion.
+- **VPS telemetry**: CPU, memory, disk, bandwidth, and network latency monitoring from Komari Emerald are removed.
+- **Multi-user accounts and i18n**: SIMerald supports a single site owner and a Simplified Chinese UI.
