@@ -31,7 +31,7 @@ mkdir -p data && sudo chown 1000:1000 data
 docker compose up -d --build
 ```
 
-服务只监听 `127.0.0.1:25780`，用 Caddy、Nginx 或 Cloudflare Tunnel 对外提供 HTTPS。
+服务只监听 `127.0.0.1:25780`，用 Caddy、Nginx 或 Cloudflare Tunnel 对外提供 HTTPS。按你用的反向代理设置 `deploy/compose.yaml` 里的 `TRUST_PROXY`（`cloudflare` / `xff` / `none`），登录输错按 IP 锁定才准确。
 
 1. 在 `docker logs simerald` 里找到首次设置密钥（也存在 `data/setup-key.txt`）
 2. 打开 `/admin`，设置密码、绑定两步验证、保存恢复码

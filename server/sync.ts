@@ -176,7 +176,7 @@ export class SyncService {
       const cardPages = await client.queryAll(cardsSource)
       const recordPages = await client.queryAll(recordsSource)
 
-      const { cards, recordCount } = buildCards(cardPages, recordPages, conn.mapping, collectAccountNames(accountPages))
+      const { cards, recordCount } = buildCards(cardPages, recordPages, conn.mapping, collectAccountNames(accountPages), this.settings.idKey)
       const syncedAt = new Date().toISOString()
       this.cache = { syncedAt, cards }
       this.store.write(CACHE_FILE, this.cache)

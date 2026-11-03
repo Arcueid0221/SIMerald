@@ -2,6 +2,7 @@ import type { SettingValue } from '../shared/settings-schema.ts'
 import type { AppConfig } from './config.ts'
 import type { FieldMapping } from './mapping.ts'
 import type { JsonStore } from './storage.ts'
+import { randomBytes } from 'node:crypto'
 import { getDefaultSettings, sanitizeSettings } from '../shared/settings-schema.ts'
 import { DEFAULT_MAPPING, parseMappingText } from './mapping.ts'
 import { normalizeNotionId } from './notion.ts'
@@ -24,6 +25,8 @@ interface StoredSettings {
 
 interface StoredSecrets {
   notionToken: string | null
+  /** 生成对外卡片 ID 用的密钥，首次启动时自动生成 */
+  idKey?: string
 }
 
 export interface NotionConnection {
@@ -66,6 +69,10 @@ export class SettingsService {
       },
     }
     this.secrets = store.read<StoredSecrets>(SECRETS_FILE, { notionToken: null })
+    if (!this.secrets.idKey) {
+      this.secrets.idKey = randomBytes(32).toString('base64url')
+      this.store.write(SECRETS_FILE, this.secrets)
+    }
   }
 
   private save(): void {
@@ -82,6 +89,10 @@ export class SettingsService {
 
   get timezone(): string {
     return this.data.timezone
+  }
+
+  get idKey(): string {
+    return this.secrets.idKey!
   }
 
   get sitename(): string {

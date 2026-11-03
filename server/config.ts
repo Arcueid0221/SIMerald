@@ -19,6 +19,19 @@ function env(name: string): string | undefined {
   return value || undefined
 }
 
+/** 从哪里取访客的真实 IP（登录失败按 IP 锁定要用） */
+export type TrustProxy = 'none' | 'cloudflare' | 'xff'
+
+const TRUST_PROXY_VALUES: TrustProxy[] = ['none', 'cloudflare', 'xff']
+
+function readTrustProxy(): TrustProxy {
+  const value = env('TRUST_PROXY')?.toLowerCase() ?? 'none'
+  if ((TRUST_PROXY_VALUES as string[]).includes(value))
+    return value as TrustProxy
+  console.warn(`[config] TRUST_PROXY=${value} 无法识别，按 none 处理（可选值：${TRUST_PROXY_VALUES.join(' / ')}）`)
+  return 'none'
+}
+
 export interface AppConfig {
   port: number
   host: string
@@ -26,6 +39,11 @@ export interface AppConfig {
   staticDir: string
   version: string
   gitHash: string
+  /**
+   * none：直接用连接的来源地址；cloudflare：用 CF-Connecting-IP；xff：用 X-Forwarded-For 的最后一个地址。
+   * 只有确定请求都经过对应的代理时才能打开，否则别人可以伪造请求头绕过按 IP 锁定
+   */
+  trustProxy: TrustProxy
   /** 来自环境变量的 Notion token；为空时可以在设置面板里填写 */
   envNotionToken: string | null
   /** 环境变量里的默认数据库 ID，设置面板没填时使用 */
@@ -45,6 +63,7 @@ export function loadConfig(): AppConfig {
     staticDir,
     version: readPackageVersion(),
     gitHash: env('GIT_HASH') ?? 'dev',
+    trustProxy: readTrustProxy(),
     envNotionToken: env('NOTION_TOKEN') ?? null,
     envCardsDb: env('NOTION_CARDS_DB') ?? null,
     envRecordsDb: env('NOTION_RECORDS_DB') ?? null,

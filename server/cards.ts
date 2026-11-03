@@ -1,6 +1,7 @@
 import type { CardKind, CardStatus, NotionColor, SimCard, SimRecord } from '../shared/types.ts'
 import type { FieldMapping } from './mapping.ts'
 import type { NotionPage } from './notion.ts'
+import { createHmac } from 'node:crypto'
 import { findTitleProperty, propDate, propList, propNumber, propRelation, propSelect, propText } from './notion.ts'
 
 /**
@@ -92,12 +93,17 @@ const STATUS_LABELS: Record<CardStatus, string> = {
   cancelled: '已注销',
 }
 
-export function buildRecord(page: NotionPage, mapping: FieldMapping, accountNames: Map<string, string>): SimRecord & { cardId: string | null } {
+/** 对外用的 ID：用站点自己的密钥对 Notion 页面 ID 做 HMAC，同一张卡每次同步结果相同，但反推不出 Notion 页面 */
+export function opaqueId(notionId: string, idKey: string): string {
+  return createHmac('sha256', idKey).update(notionId).digest('hex').slice(0, 16)
+}
+
+export function buildRecord(page: NotionPage, mapping: FieldMapping, accountNames: Map<string, string>, idKey: string): SimRecord & { cardId: string | null } {
   const p = page.properties
   const f = mapping.records
   const titleProp = p[f.title] ?? findTitleProperty(page)
   return {
-    id: page.id,
+    id: opaqueId(page.id, idKey),
     cardId: propRelation(p[f.card])[0] ?? null,
     title: propText(titleProp) ?? '',
     type: propText(p[f.type]) ?? '',
@@ -116,8 +122,9 @@ export function buildCards(
   recordPages: NotionPage[],
   mapping: FieldMapping,
   accountNames: Map<string, string>,
+  idKey: string,
 ): { cards: SimCard[], recordCount: number } {
-  const records = recordPages.map(page => buildRecord(page, mapping, accountNames))
+  const records = recordPages.map(page => buildRecord(page, mapping, accountNames, idKey))
   const recordsByCard = new Map<string, SimRecord[]>()
   for (const { cardId, ...record } of records) {
     if (!cardId)
@@ -158,7 +165,7 @@ export function buildCards(
     const color = typeSelect?.color && NOTION_COLORS.has(typeSelect.color) ? typeSelect.color as NotionColor : 'default'
 
     return {
-      id: page.id,
+      id: opaqueId(page.id, idKey),
       name,
       carrier: nameParts[0]?.trim() || name,
       last4,

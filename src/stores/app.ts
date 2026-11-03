@@ -3,6 +3,7 @@ import type { ByteDecimalsConfig } from '@/utils/helper'
 import { usePreferredDark, useStorageAsync } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { safeUrl } from '@/utils/helper'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
 type Lang = 'zh-CN' | 'en-US'
@@ -164,8 +165,8 @@ const useAppStore = defineStore('app', () => {
 
   const icpUrl = computed<string>(() => {
     const settings = publicSettings.value?.theme_settings
-    if (settings && typeof settings.icpUrl === 'string' && settings.icpUrl.trim()) {
-      return settings.icpUrl.trim()
+    if (settings && typeof settings.icpUrl === 'string' && safeUrl(settings.icpUrl)) {
+      return safeUrl(settings.icpUrl)
     }
     return 'https://beian.miit.gov.cn/'
   })
@@ -190,7 +191,7 @@ const useAppStore = defineStore('app', () => {
   const policeUrl = computed<string>(() => {
     const settings = publicSettings.value?.theme_settings
     if (settings && typeof settings.policeUrl === 'string' && settings.policeUrl.trim()) {
-      return settings.policeUrl.trim()
+      return safeUrl(settings.policeUrl)
     }
     return ''
   })
@@ -218,7 +219,7 @@ const useAppStore = defineStore('app', () => {
   const lightBackgroundUrl = computed<string>(() => {
     const settings = publicSettings.value?.theme_settings
     if (settings && typeof settings.lightBackgroundUrl === 'string') {
-      return settings.lightBackgroundUrl.trim()
+      return safeUrl(settings.lightBackgroundUrl)
     }
     return ''
   })
@@ -226,7 +227,7 @@ const useAppStore = defineStore('app', () => {
   const darkBackgroundUrl = computed<string>(() => {
     const settings = publicSettings.value?.theme_settings
     if (settings && typeof settings.darkBackgroundUrl === 'string') {
-      return settings.darkBackgroundUrl.trim()
+      return safeUrl(settings.darkBackgroundUrl)
     }
     return ''
   })

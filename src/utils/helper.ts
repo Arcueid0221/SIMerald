@@ -287,3 +287,22 @@ export function formatDateTime(timestamp: string | Date | undefined, format = 'Y
 
   return date.format(format)
 }
+
+/** 允许的链接协议：后台填的链接只放行网页地址，挡掉 javascript: / data: 之类 */
+const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:'])
+
+/**
+ * 校验并规范化链接：只接受 http(s) 和站内相对路径，返回规范化后的完整地址；不安全或格式不对时返回空字符串
+ * @param url - 原始链接
+ */
+export function safeUrl(url: string | null | undefined): string {
+  if (!url?.trim())
+    return ''
+  try {
+    const parsed = new URL(url.trim(), window.location.origin)
+    return SAFE_URL_PROTOCOLS.has(parsed.protocol) ? parsed.href : ''
+  }
+  catch {
+    return ''
+  }
+}

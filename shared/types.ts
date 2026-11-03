@@ -13,6 +13,7 @@ export type NotionColor
   = | 'default' | 'gray' | 'brown' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'red'
 
 export interface SimRecord {
+  /** 由 Notion 页面 ID 派生的不透明 ID，不能反推出 Notion 页面 */
   id: string
   /** 消费类型：首次购买/开卡、续费/保号、额外充值、其他费用 */
   type: string
@@ -35,6 +36,7 @@ export interface SimRecord {
 }
 
 export interface SimCard {
+  /** 由 Notion 页面 ID 派生的不透明 ID，用在详情页地址里；Notion 链接只在 notionUrl（需登录） */
   id: string
   /** 卡片名称，如 "Harbour Mobile · 0123" */
   name: string
@@ -42,7 +44,7 @@ export interface SimCard {
   carrier: string
   /** 号码后 4 位 */
   last4: string
-  /** 公开展示用的打码号码，如 "•••• 3575" */
+  /** 公开展示用的打码号码，如 "•••• 0123" */
   numberMasked: string
   /** 国旗 emoji，如 "🇪🇪"；没有时为空字符串 */
   region: string

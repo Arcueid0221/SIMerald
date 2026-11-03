@@ -15,6 +15,12 @@ services:
       - ./data:/data
     environment:
       TZ: Asia/Shanghai
+      # 访客真实 IP 从哪里取（登录输错按 IP 锁定要用），按你的反向代理选：
+      #   cloudflare：Cloudflare Tunnel 或 Cloudflare 代理，用 CF-Connecting-IP
+      #   xff：Nginx / Caddy 等，用 X-Forwarded-For 的最后一个地址
+      #   none：没有反向代理（默认）
+      # 选错的话，别人可以伪造请求头绕过锁定，或者所有访客被当成同一个 IP
+      TRUST_PROXY: cloudflare
       # 也可以不在这里写，登录后台后在「Notion 连接」里填
       # NOTION_TOKEN: ntn_xxx
       # NOTION_CARDS_DB: <SIM 卡数据库 ID>

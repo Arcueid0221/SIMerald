@@ -75,19 +75,32 @@ function parseCookies(header: string | undefined): Record<string, string> {
       continue
     const name = part.slice(0, index).trim()
     const value = part.slice(index + 1).trim()
-    if (name)
+    if (!name)
+      continue
+    try {
       result[name] = decodeURIComponent(value)
+    }
+    catch {
+      // 格式错误的 cookie 直接忽略，当作没有
+    }
   }
   return result
 }
 
+/** 访客 IP。只认 TRUST_PROXY 指定的请求头，没配置时不信任任何请求头 */
 function clientIp(req: IncomingMessage): string {
-  const cf = req.headers['cf-connecting-ip']
-  if (typeof cf === 'string' && cf)
-    return cf
-  const forwarded = req.headers['x-forwarded-for']
-  if (typeof forwarded === 'string' && forwarded)
-    return forwarded.split(',')[0]!.trim()
+  if (config.trustProxy === 'cloudflare') {
+    const cf = req.headers['cf-connecting-ip']
+    if (typeof cf === 'string' && cf.trim())
+      return cf.trim()
+  }
+  if (config.trustProxy === 'xff') {
+    // 反向代理会把真实来源追加在最后，前面的部分可能是访客自己伪造的
+    const forwarded = req.headers['x-forwarded-for']
+    const last = typeof forwarded === 'string' ? forwarded.split(',').at(-1)?.trim() : ''
+    if (last)
+      return last
+  }
   return req.socket.remoteAddress ?? 'unknown'
 }
 
@@ -317,7 +330,14 @@ const routes: Record<string, Handler> = {
 
 function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string): void {
   const root = path.resolve(config.staticDir)
-  let filePath = path.resolve(root, `.${decodeURIComponent(pathname)}`)
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(pathname)
+  }
+  catch {
+    throw new HttpError(400, '网址格式不对')
+  }
+  let filePath = path.resolve(root, `.${decoded}`)
   if (!filePath.startsWith(root + path.sep) && filePath !== root) {
     res.writeHead(403, SECURITY_HEADERS).end()
     return
@@ -353,10 +373,16 @@ function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string
 }
 
 const server = createServer(async (req, res) => {
-  const url = new URL(req.url ?? '/', 'http://localhost')
   const method = req.method ?? 'GET'
 
   try {
+    let url: URL
+    try {
+      url = new URL(req.url ?? '/', 'http://localhost')
+    }
+    catch {
+      throw new HttpError(400, '网址格式不对')
+    }
     if (url.pathname.startsWith('/api/') || url.pathname === '/healthz') {
       if (method !== 'GET' && method !== 'HEAD' && req.headers[CSRF_HEADER] !== '1')
         throw new HttpError(403, '请求来源校验失败')
@@ -397,6 +423,7 @@ const server = createServer(async (req, res) => {
 
 server.listen(config.port, config.host, () => {
   console.log(`[simerald] v${config.version} 已启动：http://${config.host}:${config.port}（数据目录 ${config.dataDir}）`)
+  console.log(`[simerald] 访客 IP 来源：${config.trustProxy === 'cloudflare' ? 'CF-Connecting-IP' : config.trustProxy === 'xff' ? 'X-Forwarded-For 最后一个地址' : '连接来源地址（TRUST_PROXY=none）'}`)
   console.log(sync.isDemo() ? '[simerald] 没有配置 Notion token，当前显示演示数据' : '[simerald] 已配置 Notion，数据每天同步一次')
   sync.start()
 })
