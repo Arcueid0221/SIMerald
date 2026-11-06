@@ -52,19 +52,20 @@ Set `TRUST_PROXY` in `deploy/compose.yaml` (`cloudflare`, `xff`, or `none`) to m
 
 ## Connecting Notion
 
-SIMerald reads from two required Notion databases and one optional database:
+The official Notion template provides a console page (with a renewal tracker and spending charts) along with three source databases—"📱 SIM Cards", "💰 Expense Records", and "💳 Payment Accounts"—and works on its own even without SIMerald:
 
-- **SIM Cards** (required): One row per SIM or eSIM card.
-- **Expense Records** (required): One row per initial purchase, renewal, or top-up, linked to the SIM Cards database via a relation property.
-- **Payment Accounts** (optional): Linked from SIM Cards and Expense Records to display payment account names when signed in.
+- **English template**: [SIMerald · SIM / eSIM Console (Template v1)](https://blossom-elk-1de.notion.site/SIMerald-SIM-eSIM-Console-Template-v1-79581cd90a0f83d29c5a81659658c201)
+- **中文模板**: [SIMerald · SIM / eSIM 总控台（模板 v1）](https://blossom-elk-1de.notion.site/SIMerald-SIM-eSIM-v1-9aa81cd90a0f83eb92dd01597a2b9cde)
 
-To connect your workspace:
+Connect in 5 steps (the admin UI is currently in Simplified Chinese; English UI is planned):
 
-1. Create an internal integration at [Notion Integrations](https://www.notion.so/profile/integrations) with **Read content** permission only.
-2. Open each database page in Notion, click the `•••` menu, select **Connections**, and grant access to your integration.
-3. In the `/admin` panel under the Notion connection tab, enter the integration token and the database IDs or page URLs, then save to trigger an immediate sync. You can also supply `NOTION_TOKEN`, `NOTION_CARDS_DB`, `NOTION_RECORDS_DB`, and `NOTION_ACCOUNTS_DB` via environment variables.
+1. **Duplicate a template**: Open either link above and click **"Duplicate"** (「复制」) at the top right into your Notion workspace.
+2. **Create a read-only integration**: At [Notion Integrations](https://www.notion.so/profile/integrations), create an **"Internal"** integration with ONLY **"Read content"** enabled (no user information) and copy the `ntn_` token.
+3. **Connect the page**: On your duplicated template page, click **"•••" → "Connections"** (「连接」) at the top right and add your integration.
+4. **Auto-detect & save**: Sign in at `https://<your-domain>/admin`, paste the token in **Notion connection (「Notion 连接」)**, click **Auto-detect (「自动识别」)**, then click **Save (「保存」)**.
+5. **Verify & replace samples**: Once the 3 🧪 sample cards appear on the home page, delete the 🧪 rows in Notion, add your own cards, and click **Sync now (「立即同步」)**.
 
-If your database column names differ from the defaults in [`server/mapping.ts`](server/mapping.ts), customize the JSON mapping in the admin panel. For the complete list of fields, formulas, and calculation rules, see [`docs/configuration.md`](docs/configuration.md).
+See the full setup guide and FAQ in [docs/notion-setup.md](docs/notion-setup.md) and the template schema & formulas in [docs/notion-template/template.md](docs/notion-template/template.md).
 
 ## Carrier Logos
 

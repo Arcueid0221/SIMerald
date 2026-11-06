@@ -1,12 +1,12 @@
 # Configuration Reference
 
-This document covers Notion database setup, field mappings, calculation rules, privacy visibility, admin settings, synchronization, environment variables, and data storage for SIMerald.
+This document covers Notion database setup, field presets and mappings, calculation rules, privacy visibility, admin settings, synchronization, environment variables, and data storage for SIMerald.
 
 ## Notion Databases
 
 SIMerald queries Notion using the official API (`Notion-Version: 2025-09-03`, querying data sources via `/v1/data_sources/{id}/query`). The integration is strictly read-only and only requires **Read content** capability. Archived or trashed pages are ignored.
 
-You can specify each database using its database ID, data source ID, or full Notion page URL; SIMerald normalizes any 32-character hex ID found in the string and resolves the underlying data source automatically.
+You can specify each database using its database ID, data source ID, or full Notion page URL; SIMerald normalizes any 32-character hex ID found in the string and resolves the underlying data source object (including its property schema) automatically. Alternatively, if you duplicate the official Chinese or English Notion template (see [`docs/notion-setup.md`](notion-setup.md) / [`docs/notion-setup.zh-CN.md`](notion-setup.zh-CN.md)), the admin panel can auto-detect the databases and preset shared with your integration.
 
 | Database         | Required | Role                                                                                                                                       |
 | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -25,64 +25,79 @@ The Notion property extractors in `server/notion.ts` accept multiple Notion prop
 - **Select fields with color** (`propSelect`): `select`, `status`, or any text-compatible property (falls back to `default` color).
 - **Relation fields** (`propRelation`): `relation` properties only.
 
+### Column Presets
+
+`server/mapping.ts` defines `PRESETS` with two built-in presets matching the official v1 Notion templates:
+
+- `zh` (**中文模板**): Chinese column names (`DEFAULT_MAPPING = PRESETS.zh`).
+- `en` (**English template**): English column names.
+- `custom` (**自定义映射（JSON）**): Layers a custom JSON object on top of the Chinese preset (`PRESETS.zh`) via `resolveMapping` and `mergeMapping(input, base)`.
+
+Settings persist both `notion.preset` (`'zh' | 'en' | 'custom'`) and `notion.mapping` (the custom JSON text, which is retained while `zh` or `en` is selected so switching back to `custom` restores it). Existing installations without a saved `preset` migrate automatically to `custom` if they had a non-empty custom mapping, or `zh` otherwise, keeping existing deployments unchanged.
+
 ### SIM Cards Database Fields (`cards`)
 
-Default column names are defined in `server/mapping.ts` under `DEFAULT_MAPPING.cards`:
+Default column names are defined in `server/mapping.ts` under `PRESETS.zh.cards` (`DEFAULT_MAPPING.cards`) and `PRESETS.en.cards`. Fields marked **Important** in the table drive the public card wall (flagged as `●` by the field health check):
 
-| Mapping Key           | Default Column Name        | Expected Notion Type                   | Visibility | Description                                                                                                                                       |
-| --------------------- | -------------------------- | -------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                | `卡片名称`                 | Title (falls back to any title column) | Public     | Card title. Conventionally formatted as `Carrier · 1234` (separated by `·`, `•`, or `\|`); the first segment is extracted as the carrier name.    |
-| `number`              | `号码`                     | Text / Phone number                    | Masked     | Phone number. Visitors see only `last4` (`•••• 1234`); the full `number` is returned only when signed in.                                         |
-| `country`             | `号码国家`                 | Select / Text / Formula                | Public     | Country string prefixed with a regional indicator flag emoji (e.g. `🇬🇧 英国`). Split into flag emoji (`region`) and `countryName`.                |
-| `type`                | `卡片类型`                 | Select / Status / Text                 | Owner only | Card type label and Notion select color (`typeColor`). A coarse `typeKind` (`physical`, `embedded`, `adapter`, `virtual`) is public.              |
-| `device`              | `主要使用设备`             | Text / Select                          | Owner only | Primary device where the card is installed.                                                                                                       |
-| `keepAlive`           | `保号动作`                 | Multi-select / Rollup / Text           | Public     | Keep-alive actions required to maintain the number.                                                                                               |
-| `cycle`               | `续费周期`                 | Select / Text / Formula                | Public     | Renewal cycle label (`cycleLabel`). The first integer found in the text is parsed as `cycleDays` (non-numeric values such as `不固定` yield `0`). |
-| `price`               | `续费金额`                 | Number / Formula / Rollup              | Public     | Renewal price in the card's renewal currency (defaults to `0` if empty).                                                                          |
-| `currency`            | `续费币种`                 | Select / Text / Formula                | Public     | Renewal currency. Extracts a 3-letter uppercase ISO currency code (e.g. `GBP`, `USD`, `HKD`); defaults to `CNY` if none is found.                 |
-| `balance`             | `当前余额`                 | Number / Formula / Rollup              | Owner only | Current account balance.                                                                                                                          |
-| `balanceUpdatedAt`    | `余额更新日期`             | Date / Formula / Rollup                | Owner only | Date when the balance was last verified (`YYYY-MM-DD`). Highlighted in the UI if older than 90 days.                                              |
-| `expiresAt`           | `当前有效期至`             | Date / Formula / Rollup                | Public     | Current validity expiration date (`YYYY-MM-DD`).                                                                                                  |
-| `nextRenewal`         | `下次续费日期`             | Date / Formula / Rollup                | Public     | Next renewal date or date range (`start` and optional `end`).                                                                                     |
-| `nextRenewalOverride` | `下次续费日期（手动覆盖）` | Date / Formula                         | Public     | Manual override date or date range used when `nextRenewal` is empty.                                                                              |
-| `status`              | `号码状态`                 | Formula / Status / Select / Text       | Public     | Card status text matched against `statusValues`.                                                                                                  |
-| `cancelledAt`         | `停用日期`                 | Date / Formula                         | Public     | Deactivation / cancellation date (`YYYY-MM-DD`).                                                                                                  |
-| `firstPurchaseAt`     | `首次购买日期`             | Date / Formula / Rollup                | Public     | Initial purchase date (`YYYY-MM-DD`). Falls back to the earliest dated expense record for the card if empty.                                      |
-| `totalSpentCNY`       | `卡消费合计 CNY`           | Formula / Rollup / Number              | Public     | Total historical spend for the card in CNY. Falls back to the sum of `amountCNY` across the card's expense records if empty.                      |
-| `urgency`             | `续费紧急度`               | Formula / Select / Text                | Public     | Urgency text from Notion (included in the public card payload, not directly rendered as a standalone widget).                                     |
-| `services`            | `绑定的服务`               | Multi-select / Rollup / Text           | Owner only | Bound online services or accounts (displayed as tags when signed in).                                                                             |
-| `account`             | `管理账号`                 | Text / Email                           | Owner only | Carrier management login or account identifier.                                                                                                   |
-| `paymentAccounts`     | `默认扣款账户`             | Relation (to Payment Accounts DB)      | Owner only | Relation IDs resolved to titles from the Payment Accounts database.                                                                               |
-| `dataCheck`           | `⚠️ 数据检查`              | Formula / Text                         | Owner only | Data validation warning formula or note from Notion.                                                                                              |
+| Mapping Key           | Default Column (`zh`)      | Default Column (`en`)     | Expected Notion Type                   | Visibility | Important | Description                                                                                                                                       |
+| --------------------- | -------------------------- | ------------------------- | -------------------------------------- | ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                | `卡片名称`                 | `Card Name`               | Title (falls back to any title column) | Public     | Yes       | Card title. Conventionally formatted as `Carrier · 1234` (separated by `·`, `•`, or `\|`); the first segment is extracted as the carrier name.    |
+| `number`              | `号码`                     | `Number`                  | Text / Phone number                    | Masked     | Yes       | Phone number. Visitors see only `last4` (`•••• 1234`); the full `number` is returned only when signed in.                                         |
+| `country`             | `号码国家`                 | `Country`                 | Select / Text / Formula                | Public     | Yes       | Country string prefixed with a regional indicator flag emoji (e.g. `🇬🇧 英国`). Split into flag emoji (`region`) and `countryName`.                |
+| `type`                | `卡片类型`                 | `Card Type`               | Select / Status / Text                 | Owner only | No        | Card type label and Notion select color (`typeColor`). A coarse `typeKind` (`physical`, `embedded`, `adapter`, `virtual`) is public.              |
+| `device`              | `主要使用设备`             | `Device`                  | Text / Select                          | Owner only | No        | Primary device where the card is installed.                                                                                                       |
+| `keepAlive`           | `保号动作`                 | `Keep-alive Actions`      | Multi-select / Rollup / Text           | Public     | No        | Keep-alive actions required to maintain the number.                                                                                               |
+| `cycle`               | `续费周期`                 | `Renewal Cycle`           | Select / Text / Formula                | Public     | Yes       | Renewal cycle label (`cycleLabel`). The first integer found in the text is parsed as `cycleDays` (non-numeric values such as `不固定` yield `0`). |
+| `price`               | `续费金额`                 | `Renewal Price`           | Number / Formula / Rollup              | Public     | Yes       | Renewal price in the card's renewal currency (defaults to `0` if empty).                                                                          |
+| `currency`            | `续费币种`                 | `Renewal Currency`        | Select / Text / Formula                | Public     | Yes       | Renewal currency. Extracts a 3-letter uppercase ISO currency code (e.g. `GBP`, `USD`, `HKD`); defaults to `CNY` if none is found.                 |
+| `balance`             | `当前余额`                 | `Balance`                 | Number / Formula / Rollup              | Owner only | No        | Current account balance.                                                                                                                          |
+| `balanceUpdatedAt`    | `余额更新日期`             | `Balance Checked`         | Date / Formula / Rollup                | Owner only | No        | Date when the balance was last verified (`YYYY-MM-DD`). Highlighted in the UI if older than 90 days.                                              |
+| `expiresAt`           | `当前有效期至`             | `Valid Until`             | Date / Formula / Rollup                | Public     | Yes       | Current validity expiration date (`YYYY-MM-DD`).                                                                                                  |
+| `nextRenewal`         | `下次续费日期`             | `Next Renewal`            | Date / Formula / Rollup                | Public     | No        | Next renewal date or date range (`start` and optional `end`).                                                                                     |
+| `nextRenewalOverride` | `下次续费日期（手动覆盖）` | `Next Renewal Override`   | Date / Formula                         | Public     | No        | Manual override date or date range used when `nextRenewal` is empty.                                                                              |
+| `status`              | `号码状态`                 | `Status`                  | Formula / Status / Select / Text       | Public     | Yes       | Card status text matched against `statusValues`.                                                                                                  |
+| `cancelledAt`         | `停用日期`                 | `Cancelled On`            | Date / Formula                         | Public     | Yes       | Deactivation / cancellation date (`YYYY-MM-DD`).                                                                                                  |
+| `firstPurchaseAt`     | `首次购买日期`             | `First Purchase`          | Date / Formula / Rollup                | Public     | No        | Initial purchase date (`YYYY-MM-DD`; rollup of earliest record `Date` in the official template). Falls back to the earliest dated expense record. |
+| `totalSpentCNY`       | `卡消费合计 CNY`           | `Total Spent CNY`         | Formula / Rollup / Number              | Public     | No        | Total historical spend in CNY (rollup sum of `Amount CNY` in the official template). Falls back to summing `amountCNY` across the card's records. |
+| `urgency`             | `续费紧急度`               | `Urgency`                 | Formula / Select / Text                | Public     | No        | Urgency text from Notion (included in the public card payload, not directly rendered as a standalone widget).                                     |
+| `services`            | `绑定的服务`               | `Linked Services`         | Multi-select / Rollup / Text           | Owner only | No        | Bound online services or accounts (displayed as tags when signed in).                                                                             |
+| `account`             | `管理账号`                 | `Account Login`           | Text / Email                           | Owner only | No        | Carrier management login or account identifier.                                                                                                   |
+| `paymentAccounts`     | `默认扣款账户`             | `Default Payment Account` | Relation (to Payment Accounts DB)      | Owner only | No        | Relation IDs resolved to titles from the Payment Accounts database.                                                                               |
+| `dataCheck`           | `⚠️ 数据检查`              | `⚠️ Data Check`           | Formula / Text                         | Owner only | No        | Data validation warning formula or note from Notion.                                                                                              |
 
 ### Expense Records Database Fields (`records`)
 
-Default column names are defined in `server/mapping.ts` under `DEFAULT_MAPPING.records`:
+Default column names are defined in `server/mapping.ts` under `PRESETS.zh.records` (`DEFAULT_MAPPING.records`) and `PRESETS.en.records`:
 
-| Mapping Key | Default Column Name | Expected Notion Type               | Visibility | Description                                                                                       |
-| ----------- | ------------------- | ---------------------------------- | ---------- | ------------------------------------------------------------------------------------------------- |
-| `title`     | `记录`              | Title (falls back to title column) | Owner only | Record title. Stripped from public API responses.                                                 |
-| `card`      | `SIM 卡`            | Relation (to SIM Cards DB)         | Internal   | Links the expense record to a SIM card (uses the first linked page ID).                           |
-| `type`      | `消费类型`          | Select / Text                      | Public     | Expense type label (e.g. initial purchase, renewal, top-up).                                      |
-| `date`      | `消费日期`          | Date / Formula                     | Public     | Transaction date (`YYYY-MM-DD`).                                                                  |
-| `amount`    | `支付金额`          | Number / Formula                   | Public     | Amount paid in the transaction currency.                                                          |
-| `currency`  | `货币`              | Select / Text                      | Public     | Transaction currency (extracts 3-letter ISO code, defaults to `CNY`).                             |
-| `rate`      | `当时汇率`          | Number / Formula                   | Public     | Historical exchange rate to CNY at the time of transaction.                                       |
-| `amountCNY` | `等额 CNY`          | Formula / Number                   | Public     | Transaction amount converted to CNY.                                                              |
-| `extendsTo` | `本次有效期延至`    | Date / Formula                     | Public     | Date to which this transaction extends the card's validity (`YYYY-MM-DD`).                        |
-| `accounts`  | `扣款账户`          | Relation (to Payment Accounts DB)  | Owner only | Relation IDs resolved to titles from the Payment Accounts database. Stripped for public visitors. |
+| Mapping Key | Default Column (`zh`) | Default Column (`en`) | Expected Notion Type               | Visibility | Important | Description                                                                                       |
+| ----------- | --------------------- | --------------------- | ---------------------------------- | ---------- | --------- | ------------------------------------------------------------------------------------------------- |
+| `title`     | `记录`                | `Record`              | Title (falls back to title column) | Owner only | No        | Record title. Stripped from public API responses.                                                 |
+| `card`      | `SIM 卡`              | `SIM Card`            | Relation (to SIM Cards DB)         | Internal   | Yes       | Links the expense record to a SIM card (uses the first linked page ID).                           |
+| `type`      | `消费类型`            | `Type`                | Select / Text                      | Public     | Yes       | Expense type label (e.g. initial purchase, renewal, top-up). Also resolved to `kind`.             |
+| `date`      | `消费日期`            | `Date`                | Date / Formula                     | Public     | Yes       | Transaction date (`YYYY-MM-DD`).                                                                  |
+| `amount`    | `支付金额`            | `Amount`              | Number / Formula                   | Public     | Yes       | Amount paid in the transaction currency.                                                          |
+| `currency`  | `货币`                | `Currency`            | Select / Text                      | Public     | Yes       | Transaction currency (extracts 3-letter ISO code, defaults to `CNY`).                             |
+| `rate`      | `当时汇率`            | `Rate to CNY`         | Number / Formula                   | Public     | No        | Historical exchange rate to CNY at the time of transaction.                                       |
+| `amountCNY` | `等额 CNY`            | `Amount CNY`          | Formula / Number                   | Public     | Yes       | Transaction amount converted to CNY.                                                              |
+| `extendsTo` | `本次有效期延至`      | `Extends To`          | Date / Formula                     | Public     | Yes       | Date to which this transaction extends the card's validity (`YYYY-MM-DD`).                        |
+| `accounts`  | `扣款账户`            | `Payment Account`     | Relation (to Payment Accounts DB)  | Owner only | No        | Relation IDs resolved to titles from the Payment Accounts database. Stripped for public visitors. |
 
-### Status Value Mapping (`statusValues`)
+### Status and Record Type Vocabularies (`statusValues` and `recordTypes`)
 
-`DEFAULT_MAPPING.statusValues` maps the text returned by the `status` column to internal status codes:
+Both built-in presets (`zh` and `en`) accept values from either template language out of the box:
 
-- `active`: `["使用中"]`
-- `expired`: `["已过期"]`
-- `cancelled`: `["已注销"]`
+- **`statusValues`** (maps the `status` column to internal status codes):
+  - `active`: `["使用中", "Active"]`
+  - `expired`: `["已过期", "Expired"]`
+  - `cancelled`: `["已注销", "Cancelled"]`
+- **`recordTypes`** (maps the expense record `type` column to `RecordKind`):
+  - `purchase`: `["首次购买/开卡", "Initial purchase"]`
+  - `renewal`: `["续费/保号", "Renewal"]`
+  - `topup`: `["额外充值", "Extra top-up"]`
 
 ### Customizing Field Mapping
 
-In the `/admin` panel under the Notion connection tab, you can provide a custom JSON object to override any default column names or status strings. `mergeMapping()` merges your JSON with `DEFAULT_MAPPING`, ignoring unknown keys or invalid types:
+In the `/admin` panel under the Notion connection tab, you can select `zh` (中文模板), `en` (English template), or `custom` (自定义映射（JSON）). When `custom` is selected, `mergeMapping(input, base)` layers your JSON on top of `PRESETS.zh` (`DEFAULT_MAPPING`), overriding any column names, `statusValues`, or `recordTypes` while ignoring unknown keys or invalid types:
 
 ```json
 {
@@ -97,6 +112,11 @@ In the `/admin` panel under the Notion connection tab, you can provide a custom 
     "active": ["Active", "使用中"],
     "expired": ["Expired", "已过期"],
     "cancelled": ["Cancelled", "已注销"]
+  },
+  "recordTypes": {
+    "purchase": ["Initial purchase", "首次购买/开卡"],
+    "renewal": ["Renewal", "续费/保号"],
+    "topup": ["Extra top-up", "额外充值"]
   }
 }
 ```
@@ -112,21 +132,22 @@ In the `/admin` panel under the Notion connection tab, you can provide a custom 
   - Contains `esim` → `embedded`
   - Otherwise → `physical`
 - **Status Resolution**: If the `status` property matches a string in `statusValues.cancelled`, `statusValues.expired`, or `statusValues.active`, that status is used. Otherwise, SIMerald falls back to: `cancelled` if `cancelledAt` is set; `expired` if `expiresAt` is earlier than today (`YYYY-MM-DD`); `active` otherwise.
+- **Record Kind (`SimRecord.kind`)**: Resolved on the backend by `resolveRecordKind(type, mapping)` into `'purchase' | 'renewal' | 'topup' | 'other'` (`RecordKind`). It first checks for an exact match against `mapping.recordTypes`, then falls back to case-insensitive substring matching in either language (`首次`, `开卡`, `首购`, `purchase`, `activation`, `initial` → `purchase`; `续费`, `保号`, `renew` → `renewal`; `充值`, `top-up`, `top up`, `topup`, `recharge` → `topup`), and otherwise returns `'other'`. The frontend uses `kind` for renewal-history chart/list colors, initial purchase price on cards, and cumulative-spend breakdown (`首购` / `续费` / `其他`). Cached records written by older versions have `kind` backfilled automatically on startup (`SyncService.backfillRecordKinds`).
 - **Next Renewal Date**: Resolved in order: `nextRenewal.start` → `nextRenewalOverride.start` → `expiresAt`. For `cancelled` cards, `nextRenewalAt` and `nextRenewalEnd` are forced to `null`.
 - **Period Start (`periodStart`)**: Expense records for a card are sorted by `date` descending (ties broken by `extendsTo` descending). `periodStart` is the `date` of the most recent record that has both `date` and `extendsTo`.
 - **Remaining Days and Validity Ring**: Calculated in the browser relative to the visitor's current date so countdowns stay accurate between daily syncs.
-- **Financial Metrics and Exchange Rates**: Renewal price (`price`), currency (`currency`), and cycle (`cycleDays`) feed the frontend financial helper to compute monthly cost, yearly keep-alive cost, and remaining value using live daily exchange rates fetched by the browser. Cards with `price = 0` are treated as free keep-alive cards ("白嫖中") and excluded from value totals. Historical spend (`totalSpentCNY`) uses the CNY amounts recorded in Notion (`卡消费合计 CNY`, or the sum of record `amountCNY` values) across all cards, including cancelled ones.
+- **Financial Metrics and Exchange Rates**: Renewal price (`price`), currency (`currency`), and cycle (`cycleDays`) feed `src/utils/financeHelper.ts` (supporting 38 currencies, including `AED`, `MOP` and `TWD`, with built-in fallback rates; unknown codes fall back to `CNY`) to compute monthly cost, yearly keep-alive cost, and remaining value using live daily exchange rates fetched by the browser (`frankfurter.app`, plus `open.er-api.com` for currencies not covered by Frankfurter). Cards with `price = 0` are treated as free keep-alive cards ("白嫖中") and excluded from value totals. Historical spend (`totalSpentCNY`) uses the CNY amounts recorded in Notion (`卡消费合计 CNY` / `Total Spent CNY`, or the sum of record `amountCNY` values) across all cards, including cancelled ones.
 
 ## Public vs. Owner-Only Visibility
 
-Filtering happens on the backend in `server/view.ts` (`toPublicCard`). When an unauthenticated visitor requests `/api/cards`, only whitelisted properties are returned:
+Filtering happens on the backend in `server/view.ts` (`toPublicCard` and `publicRecord`). When an unauthenticated visitor requests `/api/cards`, only whitelisted properties are returned:
 
 | Data                                                                                                                                                               | Public Visitor | Signed-In Owner |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | --------------- |
 | `id`, `name`, `carrier`, `last4`, `numberMasked`, `region`, `countryName`, `logo`, `order`                                                                         | Yes            | Yes             |
 | `typeKind`, `typeColor`, `keepAlive`, `cycleDays`, `cycleLabel`, `price`, `currency`                                                                               | Yes            | Yes             |
 | `expiresAt`, `nextRenewalAt`, `nextRenewalEnd`, `periodStart`, `status`, `statusLabel`, `cancelledAt`, `firstPurchaseAt`, `totalSpentCNY`, `urgency`               | Yes            | Yes             |
-| Expense record `id`, `type`, `date`, `amount`, `currency`, `rate`, `amountCNY`, `extendsTo`                                                                        | Yes            | Yes             |
+| Expense record `id`, `type`, `kind`, `date`, `amount`, `currency`, `rate`, `amountCNY`, `extendsTo`                                                                | Yes            | Yes             |
 | Full phone number (`number`)                                                                                                                                       | No             | Yes             |
 | Full card type text (`type`) and primary device (`device`)                                                                                                         | No             | Yes             |
 | Current balance (`balance`) and balance update date (`balanceUpdatedAt`)                                                                                           | No             | Yes             |
@@ -169,22 +190,30 @@ Validated on the backend and rendered dynamically in the admin form:
 
 ### 2. Data Sync Panel
 
-- Displays current sync state (`running`, `lastStartedAt`, `lastFinishedAt`, `lastSuccessAt`, `lastReason`, `cardCount`, `recordCount`, `nextRunAt`, `lastError`, `lastWarning`).
+- Displays current sync state (`running`, `lastStartedAt`, `lastFinishedAt`, `lastSuccessAt`, `lastReason`, `cardCount`, `recordCount`, `nextRunAt`, `lastError`, `lastWarning`, `fieldIssues`).
+- Lists any schema mismatches found by `checkFields` (`server/fieldcheck.ts`) during the latest sync (`fieldIssues: FieldIssue[]`), marking public-wall fields with `●` (`important: true`) and owner-only fields with `○` (`important: false`). Field issues do not fail the sync.
 - Provides a manual sync button for immediate synchronization.
 - Configures the daily sync time (`HH:mm`, default `05:00`) and IANA timezone (default `Asia/Shanghai`).
 
 ### 3. Notion Connection Panel
 
-- Configures the Notion integration token (write-only in the UI; never returned in plaintext once saved), `cardsDb`, `recordsDb`, optional `accountsDb`, and custom JSON `mapping`.
+- Configures the Notion integration token (write-only in the UI; never returned in plaintext once saved), `cardsDb`, `recordsDb`, optional `accountsDb`, field `preset` (`zh`, `en`, or `custom`), and custom JSON `mapping` (exposed in `AdminStatus.notion.preset` and accepted by `PUT /api/admin/notion`). Saving Notion settings shows a warning toast if the subsequent sync reports `fieldIssues`.
+- **Template Auto-Detection (`POST /api/admin/notion/detect`)**: Requires authentication and CSRF header; accepts `{ token?: string }` (uses the token typed in the form if given, validated to 20–200 chars, or falls back to the saved token). `detectTemplates(client)` in `server/detect.ts` searches data sources shared with the integration via `POST /v1/search` (filtered to `data_source`, up to 5 pages × 100): a data source with at least 10 of a preset's card column names is recognized as a SIM Cards database (best-matching preset wins), the Expense Records database is identified via its `records.card` relation pointing to that card database, and the Payment Accounts database is identified as the target of `cards.paymentAccounts`. Returns `{ matches: DetectMatch[] }` (`{ preset, cards, records, accounts, matchedColumns }`, with `{ id, title }` per database), ordered with complete matches first. The admin UI populates the preset and database IDs automatically when there is a single match, or lets the owner pick when multiple matches are found; saving remains a separate step.
 
 ### 4. Account Security Panel
 
 - Change the owner password, rebind TOTP two-factor authentication, regenerate one-time recovery codes, or revoke other active sessions.
 
-## Sync Schedule and Caching
+## Sync Schedule, Field Health Check, and Caching
 
 - **Daily Schedule**: `SyncService` calculates the next occurrence of the configured `HH:mm` in the configured timezone using `Intl.DateTimeFormat` and schedules a timer.
-- **Stale Startup Sync**: On server startup, if Notion is configured and the cached data is missing or older than 25 hours (`STALE_AFTER_MS`), a background sync triggers automatically after 3 seconds.
+- **Stale Startup Sync & Backfill**: On server startup, cached records missing `kind` are backfilled via `SyncService.backfillRecordKinds`. If Notion is configured and the cached data is missing or older than 25 hours (`STALE_AFTER_MS`), a background sync triggers automatically after 3 seconds.
+- **Field Health Check (`server/fieldcheck.ts`)**: Each sync resets `SyncStatus.fieldIssues` to `null` at the start, then runs `checkFields(db, schema, mapping)` against the resolved `cards` and `records` data source schemas. It reports missing columns (`problem: 'missing'`) or incompatible property types (`problem: 'type'`, with `actualType` and `expectedTypes`). Title mappings (`cards.name`, `records.title`) are not flagged if the database has any `title` column (title fallback). Acceptable property types per extractor are:
+  - Text fields: `title`, `rich_text`, `select`, `status`, `phone_number`, `email`, `url`, `number`, `multi_select`, `formula`, `rollup`
+  - Number fields: `number`, `formula`, `rollup`
+  - Date fields: `date`, `created_time`, `formula`, `rollup`
+  - List fields: `multi_select`, `rollup`, plus all text types
+  - Relation fields: `relation`
 - **Local Cache**: Synced cards are stored in `<DATA_DIR>/cache.json` and sync metadata in `<DATA_DIR>/sync-status.json`. Visitor page loads read exclusively from memory/disk cache and never trigger requests to Notion.
 - **Rate Limiting & Retries**: `NotionClient` spaces requests by at least `350 ms` (`MIN_INTERVAL_MS`), enforces a `20 s` timeout per request, and retries HTTP `429`, `5xx`, and network errors up to 4 times (honoring `Retry-After` headers or exponential backoff).
 - **Failure Handling**: If a sync fails, the previous `cache.json` is kept intact and `lastError` is recorded in `sync-status.json`.
@@ -223,10 +252,10 @@ All mutable state lives inside `DATA_DIR` (`/data` inside the container, `./data
 
 - `auth.json`: owner credentials (scrypt password hash, TOTP secret, recovery codes, active sessions)
 - `setup-key.txt`: one-time setup key, present only until initial setup is completed
-- `settings.json`: site, theme, sync and Notion connection settings
+- `settings.json`: site, theme, sync and Notion connection settings (including `notion.preset` and `notion.mapping`)
 - `secrets.json`: the Notion token and the `idKey` HMAC secret
 - `cache.json`: Cached `SimCard[]` payload and `syncedAt` timestamp
-- `sync-status.json`: Last sync timestamps, counts, warnings, and errors
+- `sync-status.json`: Last sync timestamps, counts, warnings, `fieldIssues`, and errors
 - `logos/`: User-supplied carrier logo image files
 
 Back up the entire `data/` directory to preserve your credentials, settings, logos, and cached data. In Docker deployments, the container runs as user `node` (UID `1000`, GID `1000`), so the host directory must be owned by `1000:1000`.
@@ -236,4 +265,5 @@ Back up the entire `data/` directory to preserve your credentials, settings, log
 When no Notion token is configured (neither in the admin panel nor via `NOTION_TOKEN`), `SyncService.isDemo()` returns `true`:
 
 - `/api/cards` serves built-in fictional SIM cards generated by `server/demo.ts`.
+- The demo-mode banner on the home page links to the Notion setup tutorial (`src/utils/links.ts` `NOTION_SETUP_URL`, pointing to `docs/notion-setup.zh-CN.md` on GitHub).
 - Scheduled startup syncs are skipped until a Notion token and database IDs are saved.

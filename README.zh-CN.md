@@ -52,19 +52,20 @@ docker compose up -d --build
 
 ## 接入 Notion
 
-SIMerald 需要读取两个必选数据库和一个可选数据库：
+官方 Notion 模板包含一个带续费一览与消费图表的控制台页面，以及「📱 SIM 卡」「💰 消费记录」「💳 支付账户」三个源数据库（即使不部署 SIMerald 也可单独作为续费看板使用）：
 
-- **SIM 卡**（必选）：每张 SIM / eSIM 卡占一行。
-- **消费记录**（必选）：开卡、续费、充值等每笔消费占一行，通过关联（Relation）属性指向「SIM 卡」数据库。
-- **扣款账户**（可选）：与「SIM 卡」和「消费记录」关联，仅在站长登录后显示扣款账户名称。
+- **中文模板**：[SIMerald · SIM / eSIM 总控台（模板 v1）](https://blossom-elk-1de.notion.site/SIMerald-SIM-eSIM-v1-9aa81cd90a0f83eb92dd01597a2b9cde)
+- **English template**：[SIMerald · SIM / eSIM Console (Template v1)](https://blossom-elk-1de.notion.site/SIMerald-SIM-eSIM-Console-Template-v1-79581cd90a0f83d29c5a81659658c201)
 
-连接步骤：
+接入只需 5 步：
 
-1. 前往 [Notion Integrations](https://www.notion.so/profile/integrations) 创建 Internal integration，权限仅勾选「读取内容（Read content）」。
-2. 在 Notion 中打开上述数据库所在页面，点击右上角 `•••` 菜单 →「连接（Connections）」，授权刚刚创建的 integration。
-3. 在 `/admin` 后台的「Notion 连接」面板中填入 token 以及各数据库的 ID 或页面链接，保存后会立即触发同步。也可以通过环境变量 `NOTION_TOKEN`、`NOTION_CARDS_DB`、`NOTION_RECORDS_DB`、`NOTION_ACCOUNTS_DB` 进行配置。
+1. **复制模板**：打开上方任一模板链接，点击右上角「复制」（Duplicate）到你的 Notion 工作区。
+2. **创建只读集成**：前往 [Notion Integrations](https://www.notion.so/profile/integrations) 新建内部集成，「能力」仅勾选「读取内容」（Read content），用户信息选「不包含用户信息」，保存并复制 `ntn_` 开头的密钥（Token）。
+3. **授权页面**：打开复制后的模板页面，点击右上角「•••」→「连接」（Connections），选择刚创建的集成。
+4. **后台自动识别**：登录 `https://<你的域名>/admin`，在「Notion 连接」面板填入 Token，点击「自动识别」自动匹配模板与数据库 ID，然后点击「保存」。
+5. **验证并替换数据**：首页出现 3 张 🧪 示例卡后，在 Notion 中删掉带 🧪 的示例行、添加你自己的卡片，再回后台点击「立即同步」。
 
-如果数据库列名与 [`server/mapping.ts`](server/mapping.ts) 中的默认值不同，可在后台「字段映射」中以 JSON 格式自定义。完整的字段说明、公式支持及计算规则参见 [`docs/configuration.md`](docs/configuration.md)。
+详细教程与常见问题见 [docs/notion-setup.zh-CN.md](docs/notion-setup.zh-CN.md)，模板完整字段与公式定义见 [docs/notion-template/template.zh-CN.md](docs/notion-template/template.zh-CN.md)。
 
 ## 运营商 Logo
 
