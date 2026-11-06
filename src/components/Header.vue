@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { computed, inject, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { DataTooltip } from '@/components/ui/data-tooltip'
 import { useAppStore } from '@/stores/app'
 
 const router = useRouter()
+const { t } = useI18n()
 const appStore = useAppStore()
 
 const isScrolled = inject<ReturnType<typeof ref<boolean>>>('isScrolled', ref(false))
@@ -17,15 +19,21 @@ const siteFavicon = ref('/favicon.svg')
 const actionButtons = computed(() => {
   const buttons = [
     {
-      title: appStore.themeMode === 'auto' ? '自动主题' : appStore.themeMode === 'light' ? '浅色主题' : '深色主题',
+      title: t(`header.theme.${appStore.themeMode}`),
       icon: appStore.themeMode === 'auto' ? 'icon-park-outline:dark-mode' : appStore.themeMode === 'light' ? 'icon-park-outline:sun-one' : 'icon-park-outline:moon',
       action: 'toggleTheme',
+    },
+    {
+      // Names the language the button switches to, in that language
+      title: t('header.switchLanguage'),
+      icon: 'tabler:language',
+      action: 'toggleLanguage',
     },
   ]
 
   if (appStore.isLoggedIn || !appStore.hideAdminEntryWhenLoggedOut) {
     buttons.push({
-      title: '后台管理',
+      title: t('header.admin'),
       icon: 'icon-park-outline:setting',
       action: 'jumpToSetting',
     })
@@ -37,6 +45,9 @@ function handleButtonClick(action: string) {
   switch (action) {
     case 'toggleTheme':
       appStore.updateThemeMode()
+      break
+    case 'toggleLanguage':
+      appStore.locale = appStore.locale === 'zh-CN' ? 'en' : 'zh-CN'
       break
     case 'jumpToSetting':
       router.push('/admin')

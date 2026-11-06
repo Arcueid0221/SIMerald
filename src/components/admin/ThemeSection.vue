@@ -2,11 +2,13 @@
 import type { SettingItem, SettingValue } from '@shared/settings-schema'
 import { getDefaultSettings, SETTINGS_SCHEMA } from '@shared/settings-schema'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import AdminSection from '@/components/admin/AdminSection.vue'
 import FormField from '@/components/admin/FormField.vue'
 import SwitchToggle from '@/components/admin/SwitchToggle.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { translateKey } from '@/i18n'
 import { useAppStore } from '@/stores/app'
 import { api, ApiError } from '@/utils/api'
 
@@ -15,6 +17,7 @@ import { api, ApiError } from '@/utils/api'
  * matching how Komari renders komari-theme.json fields.
  */
 const appStore = useAppStore()
+const { t } = useI18n()
 
 const form = ref<Record<string, SettingValue>>({ ...getDefaultSettings(), ...(appStore.publicSettings?.theme_settings ?? {}) })
 const saving = ref(false)
@@ -25,7 +28,7 @@ watch(() => appStore.publicSettings?.theme_settings, (next) => {
 })
 
 interface SettingGroup {
-  title: string
+  section: string
   items: SettingItem[]
 }
 
@@ -33,17 +36,31 @@ const groups = computed<SettingGroup[]>(() => {
   const result: SettingGroup[] = []
   for (const item of SETTINGS_SCHEMA) {
     if (item.type === 'title')
-      result.push({ title: item.name, items: [] })
+      result.push({ section: item.section ?? '', items: [] })
     else
       result.at(-1)?.items.push(item)
   }
   return result
 })
 
+// Labels live in the locale dictionaries under settings.sections / settings.fields (see shared/settings-schema.ts)
+function sectionTitle(section: string): string {
+  return translateKey(`settings.sections.${section}`, {}, section)
+}
+
+function fieldName(item: SettingItem): string {
+  return translateKey(`settings.fields.${item.key}.name`, {}, item.key ?? '')
+}
+
+function fieldHelp(item: SettingItem): string | undefined {
+  return translateKey(`settings.fields.${item.key}.help`, {}, '') || undefined
+}
+
 function selectOptions(item: SettingItem): Array<{ value: string, label: string }> {
-  const values = (item.options ?? '').split(',')
-  const labels = (item.optionLabels ?? '').split(',')
-  return values.map((value, index) => ({ value, label: labels[index] || value }))
+  return (item.options ?? '').split(',').map(value => ({
+    value,
+    label: translateKey(`settings.fields.${item.key}.options.${value}`, {}, value),
+  }))
 }
 
 function fieldId(item: SettingItem): string {
@@ -64,10 +81,10 @@ async function save() {
         theme_settings: result.theme_settings,
       }
     }
-    window.$message.success('主题设置已保存')
+    window.$message.success(t('theme.saved'))
   }
   catch (e) {
-    window.$message.error(e instanceof ApiError ? e.message : '保存失败')
+    window.$message.error(e instanceof ApiError ? e.message : t('common.saveFailed'))
   }
   finally {
     saving.value = false
@@ -76,24 +93,24 @@ async function save() {
 </script>
 
 <template>
-  <AdminSection title="主题设置" icon="tabler:palette" description="保存后访客刷新页面就能看到。">
+  <AdminSection :title="t('theme.title')" icon="tabler:palette" :description="t('theme.description')">
     <form class="flex flex-col gap-6" @submit.prevent="save">
-      <section v-for="group in groups" :key="group.title" class="flex flex-col gap-3">
+      <section v-for="group in groups" :key="group.section" class="flex flex-col gap-3">
         <h4 class="text-sm font-semibold">
-          {{ group.title }}
+          {{ sectionTitle(group.section) }}
         </h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <template v-for="item in group.items" :key="item.key">
             <div v-if="item.type === 'switch'" class="flex items-start justify-between gap-3 rounded-sm bg-slate-500/5 p-2.5">
               <div class="min-w-0">
-                <label :for="fieldId(item)" class="text-sm">{{ item.name }}</label>
-                <p v-if="item.help" class="text-[11px] text-muted-foreground/80 leading-relaxed mt-0.5">
-                  {{ item.help }}
+                <label :for="fieldId(item)" class="text-sm">{{ fieldName(item) }}</label>
+                <p v-if="fieldHelp(item)" class="text-[11px] text-muted-foreground/80 leading-relaxed mt-0.5">
+                  {{ fieldHelp(item) }}
                 </p>
               </div>
-              <SwitchToggle :id="fieldId(item)" v-model="(form[item.key!] as boolean)" :label="item.name" />
+              <SwitchToggle :id="fieldId(item)" v-model="(form[item.key!] as boolean)" :label="fieldName(item)" />
             </div>
-            <FormField v-else :label="item.name" :help="item.help" :for-id="fieldId(item)" :class="item.type === 'richtext' && 'md:col-span-2'">
+            <FormField v-else :label="fieldName(item)" :help="fieldHelp(item)" :for-id="fieldId(item)" :class="item.type === 'richtext' && 'md:col-span-2'">
               <select v-if="item.type === 'select'" :id="fieldId(item)" v-model="form[item.key!]" :class="selectClass">
                 <option v-for="option in selectOptions(item)" :key="option.value" :value="option.value">
                   {{ option.label }}
@@ -111,7 +128,7 @@ async function save() {
       </section>
       <div>
         <Button type="submit" :disabled="saving">
-          保存主题设置
+          {{ t('theme.save') }}
         </Button>
       </div>
     </form>

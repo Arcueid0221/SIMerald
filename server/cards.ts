@@ -2,7 +2,7 @@ import type { CardKind, CardStatus, NotionColor, SimCard, SimRecord } from '../s
 import type { FieldMapping } from './mapping.ts'
 import type { NotionPage } from './notion.ts'
 import { createHmac } from 'node:crypto'
-import { resolveRecordKind } from './mapping.ts'
+import { resolveKeepAliveCode, resolveRecordKind } from './mapping.ts'
 import { findTitleProperty, propDate, propList, propNumber, propRelation, propSelect, propText } from './notion.ts'
 
 /**
@@ -166,6 +166,7 @@ export function buildCards(
       ?? null
     const recordSpend = history.reduce((sum, r) => sum + (r.amountCNY ?? 0), 0)
     const color = typeSelect?.color && NOTION_COLORS.has(typeSelect.color) ? typeSelect.color as NotionColor : 'default'
+    const keepAlive = propList(p[f.keepAlive])
 
     return {
       id: opaqueId(page.id, idKey),
@@ -179,7 +180,8 @@ export function buildCards(
       typeKind: detectKind(type),
       typeColor: color,
       device: propText(p[f.device]),
-      keepAlive: propList(p[f.keepAlive]),
+      keepAlive,
+      keepAliveCodes: keepAlive.map(label => resolveKeepAliveCode(label, mapping)),
       cycleDays: parseCycleDays(cycleLabel),
       cycleLabel,
       price: propNumber(p[f.price]) ?? 0,

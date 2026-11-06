@@ -32,6 +32,10 @@ export default defineConfig({
   define: {
     __BUILD_VERSION__: JSON.stringify(packageJson.version),
     __BUILD_GIT_HASH__: JSON.stringify(getCommitHash()),
+    // vue-i18n feature flags: Composition API only, no devtools in production
+    __VUE_I18N_FULL_INSTALL__: true,
+    __VUE_I18N_LEGACY_API__: false,
+    __INTLIFY_PROD_DEVTOOLS__: false,
   },
   plugins: [
     vue(),

@@ -4,6 +4,7 @@ import type { FieldMapping, PresetChoice } from './mapping.ts'
 import type { JsonStore } from './storage.ts'
 import { randomBytes } from 'node:crypto'
 import { getDefaultSettings, sanitizeSettings } from '../shared/settings-schema.ts'
+import { AppError } from './errors.ts'
 import { DEFAULT_MAPPING, isPresetChoice, parseMappingText, resolveMapping } from './mapping.ts'
 import { normalizeNotionId } from './notion.ts'
 
@@ -114,9 +115,9 @@ export class SettingsService {
 
   updateSchedule(syncTime: unknown, timezone: unknown): void {
     if (typeof syncTime !== 'string' || !TIME_REGEX.test(syncTime))
-      throw new Error('同步时间格式应为 HH:mm，例如 05:00')
+      throw new AppError(400, 'settings.badSyncTime', 'Sync time must be HH:mm, e.g. 05:00')
     if (typeof timezone !== 'string' || !isValidTimezone(timezone))
-      throw new Error('时区无效，例如 Asia/Shanghai')
+      throw new AppError(400, 'settings.badTimezone', 'Invalid timezone, e.g. Asia/Shanghai')
     this.data.syncTime = syncTime
     this.data.timezone = timezone
     this.save()
@@ -162,7 +163,7 @@ export class SettingsService {
         continue
       const id = normalizeNotionId(value)
       if (!id)
-        throw new Error(`数据库 ID 格式不对：${value}`)
+        throw new AppError(400, 'settings.badDatabaseId', `Invalid database ID: ${value}`, { value })
       ids[key] = id
     }
 
@@ -176,7 +177,7 @@ export class SettingsService {
           parseMappingText(input.mapping)
         }
         catch {
-          throw new Error('字段映射不是合法的 JSON')
+          throw new AppError(400, 'settings.badMapping', 'Column mapping is not valid JSON')
         }
         // Omit when identical to the default so future default updates take effect automatically
         const normalized = JSON.stringify(JSON.parse(input.mapping))
@@ -186,7 +187,7 @@ export class SettingsService {
 
     const newToken = typeof input.token === 'string' ? input.token.trim() : ''
     if (newToken && (newToken.length < 20 || newToken.length > 200))
-      throw new Error('Notion token 格式不对')
+      throw new AppError(400, 'notion.badToken', 'Malformed Notion token')
 
     this.data.notion = { ...ids, preset, mapping: mappingText }
     this.save()

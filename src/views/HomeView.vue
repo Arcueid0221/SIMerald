@@ -3,6 +3,7 @@ import type { SimCard } from '@shared/types'
 import { Icon } from '@iconify/vue'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, defineAsyncComponent, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import CardStyleIcon from '@/components/sim-card/CardStyleIcon.vue'
@@ -13,9 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useBackgroundSurface } from '@/composables/useBackgroundSurface'
 import { CARD_STYLES, useAppStore } from '@/stores/app'
 import { useCardsStore } from '@/stores/cards'
-import { sortCards } from '@/utils/cardHelpers'
+import { countryName, keepAliveLabels, sortCards } from '@/utils/cardHelpers'
 import { getContinent } from '@/utils/continentHelper'
-import { NOTION_SETUP_URL } from '@/utils/links'
+import { notionSetupUrl } from '@/utils/links'
 import { isRegionMatch } from '@/utils/regionHelper'
 
 defineOptions({ name: 'HomeView' })
@@ -30,6 +31,7 @@ const appStore = useAppStore()
 const { pickSurfaceClass } = useBackgroundSurface()
 const cardsStore = useCardsStore()
 const router = useRouter()
+const { t } = useI18n()
 
 onActivated(() => {
   if (appStore.homeScrollPosition > 0) {
@@ -55,8 +57,8 @@ watch(searchText, (value) => {
 })
 
 const groups = computed(() => [
-  { tab: '全部号码', name: 'all' },
-  ...cardsStore.groups.map(g => ({ tab: g.label, name: g.name })),
+  { tab: t('home.allNumbers'), name: 'all' },
+  ...cardsStore.groups.map(g => ({ tab: t(`continents.${g.name}`), name: g.name })),
 ])
 
 watch(
@@ -74,19 +76,17 @@ function isCardInGroup(card: SimCard, group: string): boolean {
   return group === 'all' || getContinent(card.region) === group
 }
 
-const CARD_STYLE_LABELS = {
-  namecard: '名片',
-  dial: '表盘',
-  bar: '横条',
-} as const
-
-const cardStyleOptions = CARD_STYLES.map(value => ({ value, label: CARD_STYLE_LABELS[value] }))
+const cardStyleOptions = computed(() => CARD_STYLES.map(value => ({
+  value,
+  label: t(`cardStyles.${value}`),
+  title: t('home.cardStyleTitle', { style: t(`cardStyles.${value}`) }),
+})))
 
 function isCardMatchSearch(card: SimCard, search: string): boolean {
   if (!search.trim())
     return true
   const lowerSearch = search.toLowerCase().trim()
-  const haystack = [card.name, card.carrier, card.countryName, card.type ?? '', card.device ?? '', card.last4, ...card.keepAlive]
+  const haystack = [card.name, card.carrier, card.countryName, countryName(card), card.type ?? '', card.device ?? '', card.last4, ...card.keepAlive, ...keepAliveLabels(card)]
   if (haystack.some(text => text.toLowerCase().includes(lowerSearch)))
     return true
   if (card.region && isRegionMatch(card.region, search))
@@ -134,20 +134,20 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
         variant="destructive"
         :class="pickSurfaceClass('border-none bg-red-400/10 rounded-md', 'border-none bg-red-400/10 backdrop-blur-xs rounded-md')"
       >
-        <AlertTitle>连接服务器失败</AlertTitle>
-        <AlertDescription>请检查网络设置或刷新页面后再试。</AlertDescription>
+        <AlertTitle>{{ t('home.connectionErrorTitle') }}</AlertTitle>
+        <AlertDescription>{{ t('home.connectionErrorBody') }}</AlertDescription>
       </Alert>
     </div>
 
     <div v-if="cardsStore.demo" class="alert px-4">
       <Alert :class="pickSurfaceClass('border-none bg-background rounded-md', 'border-none bg-background/60 backdrop-blur-xs rounded-md')">
-        <AlertTitle>当前显示的是演示数据</AlertTitle>
+        <AlertTitle>{{ t('home.demoTitle') }}</AlertTitle>
         <AlertDescription>
-          站长还没有连接 Notion，下面的号码和运营商都是虚构的。<RouterLink v-if="appStore.isLoggedIn" to="/admin" class="text-emerald-600 underline-offset-4 hover:underline">
-            去后台连接 Notion
+          {{ t('home.demoBody') }}<RouterLink v-if="appStore.isLoggedIn" to="/admin" class="text-emerald-600 underline-offset-4 hover:underline">
+            {{ t('home.demoConnect') }}
           </RouterLink>
-          <a :href="NOTION_SETUP_URL" target="_blank" rel="noopener noreferrer" class="text-emerald-600 underline-offset-4 hover:underline" :class="appStore.isLoggedIn && 'ml-2'">
-            查看接入教程
+          <a :href="notionSetupUrl()" target="_blank" rel="noopener noreferrer" class="text-emerald-600 underline-offset-4 hover:underline" :class="appStore.isLoggedIn && 'ml-2'">
+            {{ t('home.demoGuide') }}
           </a>
         </AlertDescription>
       </Alert>
@@ -189,11 +189,11 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
               <div
                 class="flex h-8 items-center gap-0.5 rounded-md p-[3px]"
                 :class="pickSurfaceClass('bg-background/60', 'bg-background/50 backdrop-blur-xl')"
-                role="radiogroup" aria-label="卡片样式"
+                role="radiogroup" :aria-label="t('home.cardStyle')"
               >
                 <button
                   v-for="option in cardStyleOptions" :key="option.value"
-                  type="button" role="radio" :aria-checked="appStore.cardStyle === option.value" :title="`${option.label}样式`"
+                  type="button" role="radio" :aria-checked="appStore.cardStyle === option.value" :title="option.title"
                   class="inline-flex h-6.5 items-center gap-1.5 rounded-sm px-2 text-xs font-medium text-foreground/60 transition-colors hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
                   :class="appStore.cardStyle === option.value && '!text-emerald-600 bg-background dark:bg-input/30'"
                   @click="appStore.cardStyle = option.value"
@@ -205,7 +205,7 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
               <div class="relative z-1 w-8 h-8">
                 <div class="absolute top-0 right-0 ">
                   <Input
-                    v-model="searchText" placeholder="搜索运营商、国家、号码后 4 位"
+                    v-model="searchText" :placeholder="t('home.searchPlaceholder')"
                     class="h-8 w-8 rounded-md border-none shadow-none transition-all placeholder:text-transparent focus:!w-60 focus:!pl-7.5 focus:placeholder:!text-muted-foreground focus:!ring-emerald-500/10"
                     :class="pickSurfaceClass('bg-background hover:!bg-background/95 focus:!bg-background', 'bg-background/50 hover:!bg-background/60 focus:!bg-background/80 backdrop-blur-xs')"
                   />
@@ -236,7 +236,7 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
               </div>
             </TransitionGroup>
             <div v-else class="text-muted-foreground text-center py-8">
-              <Empty :description="debouncedSearchText.trim() ? '没有找到匹配的号码' : '暂无号码'" />
+              <Empty :description="debouncedSearchText.trim() ? t('home.noMatch') : t('home.empty')" />
             </div>
           </TabsContent>
         </Tabs>

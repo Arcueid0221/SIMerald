@@ -31,6 +31,7 @@ export function toPublicCard(card: SimCard): SimCard {
     typeKind: card.typeKind,
     typeColor: card.typeColor,
     keepAlive: card.keepAlive,
+    keepAliveCodes: card.keepAliveCodes,
     cycleDays: card.cycleDays,
     cycleLabel: card.cycleLabel,
     price: card.price,

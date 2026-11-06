@@ -1,3 +1,5 @@
+import type { ErrorParams } from '../shared/types.ts'
+
 /**
  * Minimal read-only client for the official Notion API.
  * Uses API version 2025-09-03, where databases contain data sources queried via /v1/data_sources/{id}/query.
@@ -11,14 +13,19 @@ const MAX_RETRIES = 4
 const HEX32_REGEX = /[0-9a-f]{32}/i
 const DASHES_REGEX = /-/g
 
+/** Notion API failure; `appCode` / `params` are what the admin UI shows (see AppError) */
 export class NotionError extends Error {
   status: number
   code: string
+  appCode: string
+  params: ErrorParams
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, appCode: string, message: string, params: ErrorParams = {}) {
     super(message)
     this.status = status
     this.code = code
+    this.appCode = appCode
+    this.params = params
   }
 }
 
@@ -108,16 +115,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-function describeError(status: number, code: string, message: string): string {
+function toNotionError(status: number, code: string, message: string): NotionError {
   if (status === 401)
-    return 'Notion token 无效或已被撤销'
+    return new NotionError(status, code, 'notion.unauthorized', 'Notion token is invalid or revoked')
   if (status === 403)
-    return 'Notion integration 没有读取权限'
+    return new NotionError(status, code, 'notion.forbidden', 'The Notion integration lacks read access')
   if (status === 404 || code === 'object_not_found')
-    return '找不到数据库：ID 不对，或者没有把页面共享给这个 integration'
+    return new NotionError(status, code, 'notion.notFound', 'Database not found: wrong ID, or the page is not shared with the integration')
   if (status === 429)
-    return 'Notion 请求太频繁，请稍后再试'
-  return `Notion 接口出错（${status} ${code}）：${message}`
+    return new NotionError(status, code, 'notion.rateLimited', 'Too many Notion requests, try again later')
+  return new NotionError(status, code, 'notion.apiError', `Notion API error (${status} ${code}): ${message}`, { status, code, message })
 }
 
 export class NotionClient {
@@ -157,7 +164,7 @@ export class NotionClient {
           await sleep(1000 * attempt)
           continue
         }
-        throw new NotionError(0, 'network_error', `连不上 Notion：${(error as Error).message}`)
+        throw new NotionError(0, 'network_error', 'notion.network', `Cannot reach Notion: ${(error as Error).message}`, { message: (error as Error).message })
       }
       clearTimeout(timer)
 
@@ -172,7 +179,7 @@ export class NotionClient {
         continue
       }
       const code = payload.code ?? 'unknown'
-      throw new NotionError(response.status, code, describeError(response.status, code, payload.message ?? ''))
+      throw toNotionError(response.status, code, payload.message ?? '')
     }
   }
 
@@ -188,7 +195,7 @@ export class NotionClient {
     const db = await this.request<{ data_sources?: Array<{ id: string }> }>('GET', `/databases/${id}`)
     const first = db.data_sources?.[0]?.id
     if (!first)
-      throw new NotionError(404, 'object_not_found', '这个数据库里没有数据源')
+      throw new NotionError(404, 'object_not_found', 'notion.noDataSource', 'This database has no data source')
     return await this.getDataSource(first)
   }
 

@@ -11,6 +11,7 @@ import {
 } from '@vueuse/core'
 import createGlobe from 'cobe'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useCardsStore } from '@/stores/cards'
 import { getRenewalDays } from '@/utils/cardHelpers'
@@ -21,6 +22,7 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
+const { t } = useI18n()
 const cardsStore = useCardsStore()
 
 const displayNodes = computed(() => props.cards ?? cardsStore.cards)
@@ -493,7 +495,7 @@ function summaryFor(code: string): RegionSummary {
 function formatNearest(days: number | null): string {
   if (days === null)
     return '-'
-  return `${days >= 0 ? '+' : ''}${days}天`
+  return `${days >= 0 ? '+' : ''}${t('globe.days', days)}`
 }
 </script>
 
@@ -516,7 +518,7 @@ function formatNearest(days: number | null): string {
         >
         <div class="relative z-2 bg-background/60 rounded py-0.5 px-1 text-xs zoom-80 items-start justify-center text-nowrap">
           <div class="text-green-600 flex flex-row items-center gap-0.5">
-            <Icon icon="tabler:device-sim" width="12" height="12" /> {{ summaryFor(cluster.code).active }} 张
+            <Icon icon="tabler:device-sim" width="12" height="12" /> {{ t('globe.activeCards', summaryFor(cluster.code).active) }}
           </div>
           <div class="text-blue-600 flex flex-row items-center gap-0.5">
             <Icon icon="tabler:calendar-event" width="12" height="12" /> {{ formatNearest(summaryFor(cluster.code).nearestDays) }}

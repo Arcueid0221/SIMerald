@@ -6,7 +6,7 @@
  * Chinese preset in the settings panel for databases with other column names.
  */
 
-import type { RecordKind } from '../shared/types.ts'
+import type { KeepAliveCode, RecordKind } from '../shared/types.ts'
 
 export type MappingPreset = 'zh' | 'en'
 export type PresetChoice = MappingPreset | 'custom'
@@ -63,19 +63,32 @@ export interface FieldMapping {
     renewal: string[]
     topup: string[]
   }
+  /** Maps keep-alive option values to codes the UI can translate; unmatched labels are shown as written. */
+  keepAliveValues: Record<KeepAliveCode, string[]>
 }
 
+export const KEEP_ALIVE_CODES: KeepAliveCode[] = ['topup', 'addon', 'use', 'balanceChange', 'autoCharge', 'plan']
+
 // Value vocabularies accept both template languages, so a preset still works if a user mixes them
-const STATUS_VALUES: FieldMapping['statusValues'] = {
+export const STATUS_VALUES: FieldMapping['statusValues'] = {
   active: ['使用中', 'Active'],
   expired: ['已过期', 'Expired'],
   cancelled: ['已注销', 'Cancelled'],
 }
 
-const RECORD_TYPES: FieldMapping['recordTypes'] = {
+export const RECORD_TYPES: FieldMapping['recordTypes'] = {
   purchase: ['首次购买/开卡', 'Initial purchase'],
   renewal: ['续费/保号', 'Renewal'],
   topup: ['额外充值', 'Extra top-up'],
+}
+
+export const KEEP_ALIVE_VALUES: FieldMapping['keepAliveValues'] = {
+  topup: ['充值余额', 'Top up balance'],
+  addon: ['购买/启用增值服务', 'Buy or enable an add-on'],
+  use: ['有效使用（含收发短信）', 'Regular use (incl. SMS)'],
+  balanceChange: ['产生余额变动（如发漫游短信）', 'Balance change (e.g. roaming SMS)'],
+  autoCharge: ['自动扣费', 'Auto-charge'],
+  plan: ['购买续费套餐', 'Buy a renewal plan'],
 }
 
 export const PRESETS: Record<MappingPreset, FieldMapping> = {
@@ -119,6 +132,7 @@ export const PRESETS: Record<MappingPreset, FieldMapping> = {
     },
     statusValues: STATUS_VALUES,
     recordTypes: RECORD_TYPES,
+    keepAliveValues: KEEP_ALIVE_VALUES,
   },
   en: {
     cards: {
@@ -160,6 +174,7 @@ export const PRESETS: Record<MappingPreset, FieldMapping> = {
     },
     statusValues: STATUS_VALUES,
     recordTypes: RECORD_TYPES,
+    keepAliveValues: KEEP_ALIVE_VALUES,
   },
 }
 
@@ -214,6 +229,15 @@ export function mergeMapping(input: unknown, base: FieldMapping = DEFAULT_MAPPIN
         result.recordTypes[key] = list
     }
   }
+
+  const keepAlive = source.keepAliveValues
+  if (keepAlive && typeof keepAlive === 'object') {
+    for (const key of KEEP_ALIVE_CODES) {
+      const list = stringList(keepAlive[key])
+      if (list)
+        result.keepAliveValues[key] = list
+    }
+  }
   return result
 }
 
@@ -252,4 +276,12 @@ export function resolveRecordKind(type: string, mapping: FieldMapping): RecordKi
   if (TOPUP_KEYWORDS.some(k => lower.includes(k)))
     return 'topup'
   return 'other'
+}
+
+/** Maps a keep-alive label to its code by exact match (ignoring case), or null for labels outside the vocabulary. */
+export function resolveKeepAliveCode(label: string, mapping: FieldMapping): KeepAliveCode | null {
+  const text = label.trim().toLowerCase()
+  if (!text)
+    return null
+  return KEEP_ALIVE_CODES.find(code => mapping.keepAliveValues[code].some(v => v.trim().toLowerCase() === text)) ?? null
 }

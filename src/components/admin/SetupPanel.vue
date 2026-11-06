@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TotpEnrollment } from '@/utils/api'
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import AdminSection from '@/components/admin/AdminSection.vue'
 import FormField from '@/components/admin/FormField.vue'
 import RecoveryCodes from '@/components/admin/RecoveryCodes.vue'
@@ -10,6 +11,10 @@ import { Input } from '@/components/ui/input'
 import { api, ApiError } from '@/utils/api'
 
 const emit = defineEmits<{ done: [] }>()
+const { t } = useI18n()
+
+/** Mirrors MIN_PASSWORD_LENGTH in server/auth.ts */
+const MIN_PASSWORD_LENGTH = 10
 
 const step = ref<1 | 2 | 3>(1)
 const setupKey = ref('')
@@ -24,12 +29,12 @@ const error = ref('')
 
 async function begin() {
   error.value = ''
-  if (password.value.length < 10) {
-    error.value = '密码至少 10 位'
+  if (password.value.length < MIN_PASSWORD_LENGTH) {
+    error.value = t('errors.auth.passwordTooShort', { min: MIN_PASSWORD_LENGTH })
     return
   }
   if (password.value !== passwordConfirm.value) {
-    error.value = '两次输入的密码不一样'
+    error.value = t('setup.passwordMismatch')
     return
   }
   busy.value = true
@@ -38,7 +43,7 @@ async function begin() {
     step.value = 2
   }
   catch (e) {
-    error.value = e instanceof ApiError ? e.message : '设置失败'
+    error.value = e instanceof ApiError ? e.message : t('setup.failed')
   }
   finally {
     busy.value = false
@@ -58,7 +63,7 @@ async function finish() {
     step.value = 3
   }
   catch (e) {
-    error.value = e instanceof ApiError ? e.message : '验证失败'
+    error.value = e instanceof ApiError ? e.message : t('setup.verifyFailed')
   }
   finally {
     busy.value = false
@@ -69,17 +74,17 @@ async function finish() {
 <template>
   <div class="max-w-2xl mx-auto w-full flex flex-col gap-4">
     <AdminSection
-      v-if="step === 1" title="首次设置 · 第 1 步：设置密码" icon="tabler:key"
-      description="SIMerald 还没有站长账号。为了防止别人抢先设置，需要输入服务器上生成的一次性设置密钥：在服务器上运行 docker logs simerald 能看到，也保存在数据目录的 setup-key.txt 里。"
+      v-if="step === 1" :title="t('setup.step1.title')" icon="tabler:key"
+      :description="t('setup.step1.description')"
     >
       <form class="flex flex-col gap-4" @submit.prevent="begin">
-        <FormField label="设置密钥" for-id="setup-key" help="格式类似 ABCD-EFGH-IJKL">
+        <FormField :label="t('setup.step1.setupKey')" for-id="setup-key" :help="t('setup.step1.setupKeyHelp')">
           <Input id="setup-key" v-model="setupKey" autocomplete="off" placeholder="XXXX-XXXX-XXXX" class="font-mono uppercase" />
         </FormField>
-        <FormField label="站长密码" for-id="setup-password" help="至少 10 位，建议用密码管理器生成">
+        <FormField :label="t('setup.step1.password')" for-id="setup-password" :help="t('setup.step1.passwordHelp', { min: MIN_PASSWORD_LENGTH })">
           <Input id="setup-password" v-model="password" type="password" autocomplete="new-password" />
         </FormField>
-        <FormField label="再输一次密码" for-id="setup-password2">
+        <FormField :label="t('setup.step1.passwordConfirm')" for-id="setup-password2">
           <Input id="setup-password2" v-model="passwordConfirm" type="password" autocomplete="new-password" />
         </FormField>
         <p v-if="error" class="text-xs text-destructive">
@@ -87,19 +92,19 @@ async function finish() {
         </p>
         <div>
           <Button type="submit" :disabled="busy || !setupKey || !password">
-            下一步
+            {{ t('setup.step1.next') }}
           </Button>
         </div>
       </form>
     </AdminSection>
 
     <AdminSection
-      v-else-if="step === 2 && enrollment" title="首次设置 · 第 2 步：绑定两步验证" icon="tabler:shield-lock"
-      description="以后登录除了密码，还要输入手机验证器 App 上的 6 位数字，这个数字每 30 秒变一次。"
+      v-else-if="step === 2 && enrollment" :title="t('setup.step2.title')" icon="tabler:shield-lock"
+      :description="t('setup.step2.description')"
     >
       <form class="flex flex-col gap-4" @submit.prevent="finish">
         <TotpQr :uri="enrollment.uri" :secret="enrollment.secret" />
-        <FormField label="App 上显示的 6 位数字" for-id="setup-code">
+        <FormField :label="t('setup.step2.code')" for-id="setup-code">
           <Input id="setup-code" v-model="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" class="font-mono tracking-widest max-w-40" />
         </FormField>
         <p v-if="error" class="text-xs text-destructive">
@@ -107,22 +112,22 @@ async function finish() {
         </p>
         <div>
           <Button type="submit" :disabled="busy || code.length !== 6">
-            验证并完成
+            {{ t('setup.step2.submit') }}
           </Button>
         </div>
       </form>
     </AdminSection>
 
-    <AdminSection v-else title="首次设置 · 第 3 步：保存恢复码" icon="tabler:lifebuoy">
+    <AdminSection v-else :title="t('setup.step3.title')" icon="tabler:lifebuoy">
       <div class="flex flex-col gap-4">
         <RecoveryCodes :codes="recoveryCodes" />
         <label class="flex items-center gap-2 text-sm">
           <input v-model="saved" type="checkbox" class="accent-emerald-600 size-4">
-          我已经把恢复码保存好了
+          {{ t('setup.step3.saved') }}
         </label>
         <div>
           <Button :disabled="!saved" @click="emit('done')">
-            进入后台
+            {{ t('setup.step3.enter') }}
           </Button>
         </div>
       </div>

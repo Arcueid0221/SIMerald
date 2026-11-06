@@ -10,6 +10,7 @@ import {
   DialogPortal,
   useForwardPropsEmits,
 } from 'reka-ui'
+import { useI18n } from 'vue-i18n'
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(defineProps<DialogContentProps & {
@@ -24,6 +25,7 @@ const emits = defineEmits<DialogContentEmits>()
 
 const delegatedProps = reactiveOmit(props, 'class', 'overlayClass', 'showClose')
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
+const { t } = useI18n()
 </script>
 
 <template>
@@ -45,7 +47,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       <DialogClose
         v-if="showClose"
         class="absolute right-3 top-3 inline-flex size-7 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
-        aria-label="关闭"
+        :aria-label="t('common.close')"
       >
         <Icon icon="lucide:x" class="size-4" />
       </DialogClose>

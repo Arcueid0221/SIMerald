@@ -1,11 +1,13 @@
-import type { FieldIssue, SimCard, SyncStatus } from '../shared/types.ts'
+import type { ErrorParams, FieldIssue, SimCard, SyncReason, SyncStatus } from '../shared/types.ts'
+import type { DemoLang } from './demo.ts'
 import type { NotionPage } from './notion.ts'
 import type { SettingsService } from './settings.ts'
 import type { JsonStore } from './storage.ts'
 import { buildCards, collectAccountNames } from './cards.ts'
 import { buildDemoCards } from './demo.ts'
+import { AppError } from './errors.ts'
 import { checkFields } from './fieldcheck.ts'
-import { resolveRecordKind } from './mapping.ts'
+import { resolveKeepAliveCode, resolveRecordKind } from './mapping.ts'
 import { NotionClient, NotionError } from './notion.ts'
 
 const CACHE_FILE = 'cache.json'
@@ -59,6 +61,21 @@ export function computeNextRun(time: string, timeZone: string, now = new Date())
   return new Date(now.getTime() + 24 * 60 * 60 * 1000)
 }
 
+interface ErrorInfo {
+  code: string
+  message: string
+  params: ErrorParams
+}
+
+function errorInfo(error: unknown): ErrorInfo {
+  if (error instanceof NotionError)
+    return { code: error.appCode, message: error.message, params: error.params }
+  if (error instanceof AppError)
+    return { code: error.code, message: error.message, params: error.params }
+  const message = error instanceof Error ? error.message : String(error)
+  return { code: 'sync.failed', message, params: { message } }
+}
+
 export class SyncService {
   private store: JsonStore
   private settings: SettingsService
@@ -77,7 +94,11 @@ export class SyncService {
       lastFinishedAt: null,
       lastSuccessAt: null,
       lastError: null,
+      lastErrorCode: null,
+      lastErrorParams: null,
       lastWarning: null,
+      lastWarningCode: null,
+      lastWarningParams: null,
       lastReason: null,
       cardCount: this.cache?.cards.length ?? 0,
       recordCount: 0,
@@ -86,15 +107,17 @@ export class SyncService {
       ...store.read<Partial<SyncStatus>>(STATUS_FILE, {}),
     }
     this.status.running = false
-    this.backfillRecordKinds()
+    this.backfillCache()
   }
 
-  /** Caches written before record kinds existed get them derived locally until the next sync. */
-  private backfillRecordKinds(): void {
+  /** Caches written by older versions get record kinds (v0.2) and keep-alive codes (v0.3) derived locally until the next sync. */
+  private backfillCache(): void {
     if (!this.cache)
       return
     const mapping = this.settings.notion.mapping
     for (const card of this.cache.cards) {
+      if (!Array.isArray(card.keepAliveCodes))
+        card.keepAliveCodes = card.keepAlive.map(label => resolveKeepAliveCode(label, mapping))
       for (const record of card.history) {
         if (!record.kind)
           record.kind = resolveRecordKind(record.type, mapping)
@@ -106,9 +129,10 @@ export class SyncService {
     return !this.settings.notion.token
   }
 
-  getCards(): { cards: SimCard[], syncedAt: string | null, demo: boolean } {
+  /** `lang` only affects demo data; synced cards are always in the language of the Notion template */
+  getCards(lang: DemoLang = 'zh'): { cards: SimCard[], syncedAt: string | null, demo: boolean } {
     if (this.isDemo())
-      return { cards: buildDemoCards(), syncedAt: null, demo: true }
+      return { cards: buildDemoCards(lang), syncedAt: null, demo: true }
     return { cards: this.cache?.cards ?? [], syncedAt: this.cache?.syncedAt ?? null, demo: false }
   }
 
@@ -126,7 +150,7 @@ export class SyncService {
     const syncedAt = this.cache?.syncedAt ? new Date(this.cache.syncedAt).getTime() : 0
     if (!this.isDemo() && Date.now() - syncedAt > STALE_AFTER_MS) {
       setTimeout(() => {
-        this.run('启动时数据已过期').catch(() => {})
+        this.run('startup').catch(() => {})
       }, 3000)
     }
   }
@@ -143,7 +167,7 @@ export class SyncService {
         this.schedule()
         return
       }
-      this.run('每日定时同步').catch(() => {}).finally(() => this.schedule())
+      this.run('daily').catch(() => {}).finally(() => this.schedule())
     }, delay)
     this.timer.unref?.()
   }
@@ -154,7 +178,7 @@ export class SyncService {
     this.timer = null
   }
 
-  run(reason: string): Promise<void> {
+  run(reason: SyncReason): Promise<void> {
     if (this.running)
       return this.running
     this.running = this.doRun(reason).finally(() => {
@@ -163,7 +187,7 @@ export class SyncService {
     return this.running
   }
 
-  private async doRun(reason: string): Promise<void> {
+  private async doRun(reason: SyncReason): Promise<void> {
     const conn = this.settings.notion
     this.status.lastStartedAt = new Date().toISOString()
     this.status.lastReason = reason
@@ -172,9 +196,9 @@ export class SyncService {
 
     try {
       if (!conn.token)
-        throw new Error('还没有配置 Notion token')
+        throw new AppError(400, 'sync.noToken', 'Notion token is not configured')
       if (!conn.cardsDb || !conn.recordsDb)
-        throw new Error('还没有填写 SIM 卡数据库和消费记录数据库的 ID')
+        throw new AppError(400, 'sync.noDatabases', 'SIM card and expense record database IDs are not set')
 
       const client = new NotionClient(conn.token)
       const cardsSource = await client.resolveDataSource(conn.cardsDb)
@@ -188,14 +212,20 @@ export class SyncService {
         console.warn(`[sync] ${fieldIssues.length} mapped column(s) missing or of an unexpected type`)
       // Payment accounts are only used to resolve display names; skip on failure without failing the sync
       let accountPages: NotionPage[] = []
-      let warning: string | null = null
+      let warning: ErrorInfo | null = null
       if (conn.accountsDb) {
         try {
           accountPages = await client.queryAll((await client.resolveDataSource(conn.accountsDb)).id)
         }
         catch (error) {
-          warning = `扣款账户数据库读取失败，已跳过（扣款账户名称不会显示）：${(error as Error).message}`
-          console.warn(`[sync] ${warning}`)
+          // `cause` is itself a code; the UI translates it with the same params
+          const cause = errorInfo(error)
+          warning = {
+            code: 'sync.accountsSkipped',
+            message: `Skipped the payment accounts database (account names will not show): ${cause.message}`,
+            params: { ...cause.params, cause: cause.code },
+          }
+          console.warn(`[sync] ${warning.message}`)
         }
       }
       const cardPages = await client.queryAll(cardsSource.id)
@@ -208,15 +238,21 @@ export class SyncService {
 
       this.status.lastSuccessAt = syncedAt
       this.status.lastError = null
-      this.status.lastWarning = warning
+      this.status.lastErrorCode = null
+      this.status.lastErrorParams = null
+      this.status.lastWarning = warning?.message ?? null
+      this.status.lastWarningCode = warning?.code ?? null
+      this.status.lastWarningParams = warning?.params ?? null
       this.status.cardCount = cards.length
       this.status.recordCount = recordCount
       console.log(`[sync] Sync complete: ${cards.length} cards, ${recordCount} records`)
     }
     catch (error) {
-      const message = error instanceof NotionError || error instanceof Error ? error.message : String(error)
-      this.status.lastError = message
-      console.error(`[sync] Sync failed: ${message}`)
+      const info = errorInfo(error)
+      this.status.lastError = info.message
+      this.status.lastErrorCode = info.code
+      this.status.lastErrorParams = info.params
+      console.error(`[sync] Sync failed: ${info.message}`)
       throw error
     }
     finally {

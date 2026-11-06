@@ -3,11 +3,13 @@ import type { SimCard } from '@shared/types'
 import type { CurrencyCode } from '@/utils/financeHelper'
 import { Icon } from '@iconify/vue'
 import { computed, defineAsyncComponent, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import EarthGlobe from '@/components/EarthGlobe.vue'
 import { CardX } from '@/components/ui/card-x'
 import { DataTooltip } from '@/components/ui/data-tooltip'
 import { useBackgroundSurface } from '@/composables/useBackgroundSurface'
 import { useExchangeRates } from '@/composables/useExchangeRates'
+import { formatNumber } from '@/i18n'
 import { useAppStore } from '@/stores/app'
 import { useCardsStore } from '@/stores/cards'
 import { formatCNY, getRenewalDays } from '@/utils/cardHelpers'
@@ -24,6 +26,7 @@ const EarthMaps = defineAsyncComponent(() => import('@/components/EarthMaps.vue'
 const UPCOMING_DAYS = 30
 
 const appStore = useAppStore()
+const { t } = useI18n()
 const { pickSurfaceClass } = useBackgroundSurface()
 const cardsStore = useCardsStore()
 const { rates: exchangeRates, baseCurrency: exchangeRateBaseCurrency, setBaseCurrency } = useExchangeRates()
@@ -76,9 +79,9 @@ const spendBreakdown = computed(() => {
 })
 const formattedSpend = computed(() => financeHelper.formatFinanceAmount(spendBreakdown.value.total, 'CNY'))
 const spendTooltip = computed(() => [
-  `首购 ${formatCNY(spendBreakdown.value.purchase)}`,
-  `续费 ${formatCNY(spendBreakdown.value.renewal)}`,
-  spendBreakdown.value.other > 0 ? `其他 ${formatCNY(spendBreakdown.value.other)}` : '',
+  `${t('summary.spendPurchase')} ${formatCNY(spendBreakdown.value.purchase)}`,
+  `${t('summary.spendRenewal')} ${formatCNY(spendBreakdown.value.renewal)}`,
+  spendBreakdown.value.other > 0 ? `${t('summary.spendOther')} ${formatCNY(spendBreakdown.value.other)}` : '',
 ].filter(Boolean).join('\n'))
 
 // ==================== Renewals ====================
@@ -87,8 +90,8 @@ const upcoming = computed(() => keptCards.value
   .filter((item): item is { card: SimCard, days: number } => item.days !== null && item.days <= UPCOMING_DAYS)
   .sort((a, b) => a.days - b.days))
 const upcomingTooltip = computed(() => upcoming.value.length
-  ? upcoming.value.map(({ card, days }) => `${card.name}  ${days < 0 ? `过期 ${-days} 天` : `${days} 天`}`).join('\n')
-  : `${UPCOMING_DAYS} 天内没有要续费的号码`)
+  ? upcoming.value.map(({ card, days }) => `${card.name}  ${days < 0 ? t('days.overdue', -days) : t('days.count', days)}`).join('\n')
+  : t('summary.noUpcoming', { days: t('days.count', UPCOMING_DAYS) }))
 const nextRenewal = computed(() => keptCards.value
   .map(card => ({ card, days: getRenewalDays(card) }))
   .filter((item): item is { card: SimCard, days: number } => item.days !== null)
@@ -98,8 +101,8 @@ const nextRenewalText = computed(() => {
     return null
   const { days } = nextRenewal.value
   if (days === 0)
-    return { value: '今天', unit: '' }
-  return days < 0 ? { value: -days, unit: '天前到期' } : { value: days, unit: '天后' }
+    return { value: t('days.today'), unit: '' }
+  return days < 0 ? { value: -days, unit: t('summary.overdueUnit', -days) } : { value: days, unit: t('summary.inDaysUnit', days) }
 })
 
 // ==================== Valuation ====================
@@ -133,21 +136,21 @@ const formattedMonthlyAverageCost = computed(() => {
 })
 const financeSummaryItems = computed(() => [
   {
-    label: '总价值',
+    label: t('summary.totalValue'),
     icon: 'tabler:wallet',
     value: formattedTotalValue.value.value,
     symbol: formattedTotalValue.value.symbol,
     currency: formattedTotalValue.value.currency,
   },
   {
-    label: '月均支出',
+    label: t('summary.monthlyCost'),
     icon: 'tabler:receipt-2',
     value: formattedMonthlyAverageCost.value.value,
     symbol: formattedMonthlyAverageCost.value.symbol,
-    currency: `${formattedMonthlyAverageCost.value.currency}/月`,
+    currency: t('summary.perMonth', { currency: formattedMonthlyAverageCost.value.currency }),
   },
   {
-    label: '剩余价值',
+    label: t('summary.remainingValue'),
     icon: 'tabler:coins',
     value: formattedRemainingValue.value.value,
     symbol: formattedRemainingValue.value.symbol,
@@ -164,10 +167,10 @@ const exchangeRateRows = computed(() => financeRateCurrencies.map((currency) => 
     baseCurrency: exchangeRateBaseCurrency.value,
     baseSymbol: financeHelper.CURRENCY_SYMBOLS[exchangeRateBaseCurrency.value],
     targetSymbol: financeHelper.CURRENCY_SYMBOLS[currency],
-    rate: new Intl.NumberFormat('zh-CN', {
+    rate: formatNumber(rate, {
       maximumFractionDigits: 6,
       minimumFractionDigits: 6,
-    }).format(rate),
+    }),
   }
 }))
 const showEarth = computed(() => appStore.earthViewMode === 'earth' || appStore.earthViewMode === 'earth-stop')
@@ -198,7 +201,7 @@ const cardGridClass = computed(() => showVisualPanel.value
       >
         <div class="flex h-full flex-col justify-between gap-1">
           <div class="flex items-start justify-between">
-            <span class="text-xs font-medium tracking-wider text-muted-foreground">在用号码</span>
+            <span class="text-xs font-medium tracking-wider text-muted-foreground">{{ t('summary.activeNumbers') }}</span>
             <Icon
               icon="tabler:device-sim" :width="20" :height="20"
               class="text-slate-500/20 group-hover:text-slate-500 transition-colors"
@@ -212,7 +215,7 @@ const cardGridClass = computed(() => showVisualPanel.value
               <span class="text-md md:text-2xl font-bold leading-none tracking-tight">
                 {{ activeCards.length }}
               </span>
-              <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">张</span>
+              <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">{{ t('summary.cardUnit', activeCards.length) }}</span>
             </div>
           </Transition>
         </div>
@@ -228,7 +231,7 @@ const cardGridClass = computed(() => showVisualPanel.value
       >
         <div class="flex h-full flex-col justify-between gap-1">
           <div class="flex items-start justify-between">
-            <span class="text-xs font-medium tracking-wider text-muted-foreground">覆盖国家或地区</span>
+            <span class="text-xs font-medium tracking-wider text-muted-foreground">{{ t('summary.countries') }}</span>
             <Icon
               icon="tabler:world" :width="20" :height="20"
               class="text-slate-500/20 group-hover:text-slate-500 transition-colors"
@@ -240,7 +243,7 @@ const cardGridClass = computed(() => showVisualPanel.value
               :style="getMetricSwitchStyle(1)"
             >
               <span class="text-md md:text-2xl font-bold leading-none tracking-tight">{{ countryCount }}</span>
-              <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">个</span>
+              <span class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">{{ t('summary.countryUnit', countryCount) }}</span>
             </div>
           </Transition>
         </div>
@@ -257,7 +260,7 @@ const cardGridClass = computed(() => showVisualPanel.value
         >
           <div class="flex h-full flex-col justify-between gap-1">
             <div class="flex items-start justify-between">
-              <span class="text-xs font-medium tracking-wider text-muted-foreground">剩余价值</span>
+              <span class="text-xs font-medium tracking-wider text-muted-foreground">{{ t('summary.remainingValue') }}</span>
               <Icon
                 icon="tabler:cash" :width="20" :height="20"
                 class="text-slate-500/20 group-hover:text-slate-500 transition-colors"
@@ -312,12 +315,12 @@ const cardGridClass = computed(() => showVisualPanel.value
             <div class="shrink-0 flex flex-col flex-1">
               <div class="flex mb-1 items-center justify-between gap-2">
                 <div class="flex items-center gap-1 text-xs font-medium tracking-wider text-muted-foreground">
-                  今日汇率
+                  {{ t('summary.todayRates') }}
                 </div>
                 <select
                   :value="exchangeRateBaseCurrency"
                   class="shrink-0 rounded-sm border border-border/70 bg-background/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus:text-foreground"
-                  aria-label="切换汇率基准币种" @click.stop @change.stop="setExchangeRateBaseCurrency"
+                  :aria-label="t('summary.rateBaseCurrency')" @click.stop @change.stop="setExchangeRateBaseCurrency"
                 >
                   <option v-for="currency in financeRateCurrencies" :key="currency" :value="currency">
                     {{ currency }}
@@ -356,7 +359,7 @@ const cardGridClass = computed(() => showVisualPanel.value
       >
         <div class="flex h-full flex-col justify-between gap-1">
           <div class="flex items-start justify-between">
-            <span class="text-xs font-medium tracking-wider text-muted-foreground">累计花费</span>
+            <span class="text-xs font-medium tracking-wider text-muted-foreground">{{ t('summary.totalSpent') }}</span>
             <Icon
               icon="tabler:receipt" :width="20" :height="20"
               class="text-slate-500/20 group-hover:text-slate-500 transition-colors"
@@ -395,7 +398,7 @@ const cardGridClass = computed(() => showVisualPanel.value
       >
         <div class="flex h-full flex-col justify-between gap-1">
           <div class="flex items-start justify-between">
-            <span class="text-xs font-medium tracking-wider text-muted-foreground">{{ UPCOMING_DAYS }} 天内续费</span>
+            <span class="text-xs font-medium tracking-wider text-muted-foreground">{{ t('summary.upcomingWithin', { days: t('days.count', UPCOMING_DAYS) }) }}</span>
             <Icon
               icon="tabler:calendar-due" :width="20" :height="20"
               class="text-slate-500/20 group-hover:text-slate-500 transition-colors"
@@ -411,7 +414,7 @@ const cardGridClass = computed(() => showVisualPanel.value
                 :style="getMetricSwitchStyle(4)"
               >
                 <span class="text-md md:text-2xl font-bold leading-none tracking-tight" :class="upcoming.length > 0 ? 'text-yellow-600 dark:text-yellow-400' : ''">{{ upcoming.length }}</span>
-                <span class="text-[11px] md:text-xs font-medium text-muted-foreground">张</span>
+                <span class="text-[11px] md:text-xs font-medium text-muted-foreground">{{ t('summary.cardUnit', upcoming.length) }}</span>
               </div>
             </Transition>
           </DataTooltip>
@@ -428,7 +431,7 @@ const cardGridClass = computed(() => showVisualPanel.value
       >
         <div class="flex h-full flex-col justify-between gap-1">
           <div class="flex items-start justify-between">
-            <span class="text-xs font-medium tracking-wider text-muted-foreground">即将续费</span>
+            <span class="text-xs font-medium tracking-wider text-muted-foreground">{{ t('summary.nextRenewal') }}</span>
             <Icon
               icon="tabler:hourglass" :width="20" :height="20"
               class="text-slate-500/20 group-hover:text-slate-500 transition-colors"

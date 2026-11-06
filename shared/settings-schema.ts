@@ -5,53 +5,56 @@
 
 export type SettingType = 'title' | 'switch' | 'string' | 'number' | 'select' | 'richtext'
 
+/**
+ * Labels are not stored here: the settings panel looks up `settings.sections.<section>` for titles and
+ * `settings.fields.<key>.{name,help,options.<value>}` for fields in the locale dictionaries.
+ */
 export interface SettingItem {
   type: SettingType
+  /** Section id, for `title` items */
+  section?: string
   key?: string
-  name: string
   default?: string | number | boolean
   /** Comma-separated allowed values for select fields */
   options?: string
-  /** Comma-separated display labels corresponding to options */
-  optionLabels?: string
-  help?: string
   min?: number
   max?: number
 }
 
 export const SETTINGS_SCHEMA: SettingItem[] = [
-  { name: '基础设置', type: 'title' },
-  { key: 'sitename', name: '站点标题', type: 'string', default: 'SIMerald', help: '显示在页面左上角和浏览器标签上' },
-  { key: 'defaultCardStyle', name: '默认卡片样式', type: 'select', default: 'namecard', options: 'namecard,dial,bar', optionLabels: '名片,表盘,横条', help: '访客第一次打开时看到的卡片样式；访客可以在首页右上角自己切换，浏览器会记住' },
-  { key: 'defaultSort', name: '默认排序', type: 'select', default: 'renewal', options: 'renewal,notion,name,country', optionLabels: '按下次续费日期,按 Notion 顺序,按名称,按国家/地区', help: '卡片墙的默认顺序' },
+  { section: 'basic', type: 'title' },
+  { key: 'sitename', type: 'string', default: 'SIMerald' },
+  { key: 'defaultLanguage', type: 'select', default: 'auto', options: 'auto,zh-CN,en' },
+  { key: 'defaultCardStyle', type: 'select', default: 'namecard', options: 'namecard,dial,bar' },
+  { key: 'defaultSort', type: 'select', default: 'renewal', options: 'renewal,notion,name,country' },
 
-  { name: '公告设置', type: 'title' },
-  { key: 'alertEnabled', name: '启用公告', type: 'switch', default: false, help: '在首页显示自定义公告' },
-  { key: 'alertTitle', name: '公告标题', type: 'string', default: '', help: '公告的标题内容' },
-  { key: 'alertContent', name: '公告内容', type: 'richtext', default: '', help: '公告的详细内容（支持简单 Markdown 格式）' },
+  { section: 'alert', type: 'title' },
+  { key: 'alertEnabled', type: 'switch', default: false },
+  { key: 'alertTitle', type: 'string', default: '' },
+  { key: 'alertContent', type: 'richtext', default: '' },
 
-  { name: '页面设置', type: 'title' },
-  { key: 'earthViewMode', name: '头部展示模式', type: 'select', default: 'earth', options: 'earth,earth-stop,maps,cards,hide', optionLabels: '自转地球,静止地球,点状地图,仅显示头部卡片,隐藏整个头部' },
-  { key: 'visitorInfoCardEnabled', name: '访客信息卡片', type: 'switch', default: true, help: '显示访客来源、设备和浏览器信息卡片' },
-  { key: 'hideAdminEntryWhenLoggedOut', name: '隐藏后台入口', type: 'switch', default: false, help: '未登录时隐藏顶部后台管理入口' },
-  { key: 'disablePageAnimation', name: '减弱过渡动画', type: 'switch', default: false, help: '减少页面过渡动画效果，提升访问速度和响应性' },
-  { key: 'cancelledLast', name: '已注销后置', type: 'switch', default: true, help: '开启后已注销的号码排到最后' },
+  { section: 'page', type: 'title' },
+  { key: 'earthViewMode', type: 'select', default: 'earth', options: 'earth,earth-stop,maps,cards,hide' },
+  { key: 'visitorInfoCardEnabled', type: 'switch', default: true },
+  { key: 'hideAdminEntryWhenLoggedOut', type: 'switch', default: false },
+  { key: 'disablePageAnimation', type: 'switch', default: false },
+  { key: 'cancelledLast', type: 'switch', default: true },
 
-  { name: '备案设置', type: 'title' },
-  { key: 'icpEnabled', name: '显示备案号', type: 'switch', default: false, help: '在页脚显示网站备案号' },
-  { key: 'icpNumber', name: '备案号', type: 'string', default: '', help: '网站备案号（如：京ICP备12345678号）' },
-  { key: 'icpUrl', name: '备案跳转链接', type: 'string', default: 'https://beian.miit.gov.cn/', help: '点击备案号跳转的链接地址' },
-  { key: 'policeEnabled', name: '显示公安备案', type: 'switch', default: false, help: '在页脚显示公安备案信息' },
-  { key: 'policeNumber', name: '公安备案号', type: 'string', default: '', help: '公安备案号（如：京公网安备 11010502000000号）' },
-  { key: 'policeUrl', name: '公安备案跳转链接', type: 'string', default: '', help: '点击公安备案号跳转的链接地址，留空则不跳转' },
+  { section: 'icp', type: 'title' },
+  { key: 'icpEnabled', type: 'switch', default: false },
+  { key: 'icpNumber', type: 'string', default: '' },
+  { key: 'icpUrl', type: 'string', default: 'https://beian.miit.gov.cn/' },
+  { key: 'policeEnabled', type: 'switch', default: false },
+  { key: 'policeNumber', type: 'string', default: '' },
+  { key: 'policeUrl', type: 'string', default: '' },
 
-  { name: '自定义背景', type: 'title' },
-  { key: 'backgroundEnabled', name: '启用自定义背景', type: 'switch', default: false, help: '启用后可设置自定义图片或视频作为页面背景' },
-  { key: 'backgroundType', name: '背景类型', type: 'select', default: 'image', options: 'image,video', optionLabels: '图片,视频' },
-  { key: 'lightBackgroundUrl', name: '亮色模式背景地址', type: 'string', default: '', help: '亮色模式下的背景图片/视频 URL' },
-  { key: 'darkBackgroundUrl', name: '暗色模式背景地址', type: 'string', default: '', help: '暗色模式下的背景图片/视频 URL' },
-  { key: 'backgroundBlur', name: '背景模糊半径', type: 'number', default: 0, min: 0, max: 100, help: '背景的高斯模糊半径（单位：px），0 表示不模糊' },
-  { key: 'backgroundOverlay', name: '背景遮罩强度', type: 'number', default: 0, min: -100, max: 100, help: '负数降低背景透明度，0 表示关闭，正数为黑色遮罩，绝对值越大效果越明显' },
+  { section: 'background', type: 'title' },
+  { key: 'backgroundEnabled', type: 'switch', default: false },
+  { key: 'backgroundType', type: 'select', default: 'image', options: 'image,video' },
+  { key: 'lightBackgroundUrl', type: 'string', default: '' },
+  { key: 'darkBackgroundUrl', type: 'string', default: '' },
+  { key: 'backgroundBlur', type: 'number', default: 0, min: 0, max: 100 },
+  { key: 'backgroundOverlay', type: 'number', default: 0, min: -100, max: 100 },
 ]
 
 export type SettingValue = string | number | boolean

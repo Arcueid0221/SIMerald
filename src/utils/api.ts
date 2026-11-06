@@ -2,15 +2,24 @@
  * SIMerald backend API client.
  * State-changing requests send `X-SIMerald-Request` for CSRF protection.
  */
-import type { AdminStatus, CardsResponse, DetectMatch, MappingPresetChoice, SiteInfo, ThemeSettings } from '@shared/types'
+import type { AdminStatus, ApiErrorBody, CardsResponse, DetectMatch, ErrorParams, MappingPresetChoice, SiteInfo, ThemeSettings } from '@shared/types'
+import { currentLocale, i18n, translateError } from '@/i18n'
 
+/**
+ * A failed API call. `message` is translated at the time of the failure from the server's error code;
+ * `code` / `params` allow re-translating it later.
+ */
 export class ApiError extends Error {
   status: number
+  code: string
+  params: ErrorParams
   retryAfter?: number
 
-  constructor(status: number, message: string, retryAfter?: number) {
+  constructor(status: number, code: string, message: string, params: ErrorParams = {}, retryAfter?: number) {
     super(message)
     this.status = status
+    this.code = code
+    this.params = params
     this.retryAfter = retryAfter
   }
 }
@@ -38,22 +47,25 @@ async function request<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: u
     })
   }
   catch {
-    throw new ApiError(0, '连接服务器失败，请检查网络')
+    throw new ApiError(0, 'http.network', i18n.global.t('errors.http.network'))
   }
 
-  const data = await response.json().catch(() => ({})) as { error?: string, retryAfter?: number }
+  const data = await response.json().catch(() => ({})) as Partial<ApiErrorBody>
   if (!response.ok) {
-    let message = data.error || `请求失败（${response.status}）`
+    const code = data.code ?? 'http.requestFailed'
+    const params: ErrorParams = { status: response.status, ...data.params }
+    let message = translateError(code, params, data.error || i18n.global.t('errors.http.requestFailed', { status: response.status }))
     if (response.status === 429 && data.retryAfter)
-      message = `${message}（约 ${Math.ceil(data.retryAfter / 60)} 分钟后）`
-    throw new ApiError(response.status, message, data.retryAfter)
+      message = i18n.global.t('errors.retryIn', { message, minutes: Math.ceil(data.retryAfter / 60) })
+    throw new ApiError(response.status, code, message, params, data.retryAfter)
   }
   return data as T
 }
 
 export const api = {
   getSite: () => request<SiteInfo>('GET', '/api/site'),
-  getCards: () => request<CardsResponse>('GET', '/api/cards'),
+  /** `lang` picks the language of demo data; synced Notion data is returned as is */
+  getCards: () => request<CardsResponse>('GET', `/api/cards?lang=${currentLocale() === 'zh-CN' ? 'zh' : 'en'}`),
 
   setupBegin: (setupKey: string, password: string) =>
     request<TotpEnrollment>('POST', '/api/auth/setup/begin', { setupKey, password }),

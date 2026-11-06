@@ -11,6 +11,9 @@ export type CardKind = 'physical' | 'adapter' | 'embedded' | 'virtual'
 /** Internal category of an expense record, resolved by the backend from the record type label */
 export type RecordKind = 'purchase' | 'renewal' | 'topup' | 'other'
 
+/** Keep-alive action matching an option of the official templates; lets the UI translate the label */
+export type KeepAliveCode = 'topup' | 'addon' | 'use' | 'balanceChange' | 'autoCharge' | 'plan'
+
 /** Notion select option colors */
 export type NotionColor
   = | 'default' | 'gray' | 'brown' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'red'
@@ -56,8 +59,10 @@ export interface SimCard {
   countryName: string
   typeKind: CardKind
   typeColor: NotionColor
-  /** Actions required to keep the number active */
+  /** Actions required to keep the number active, as written in Notion */
   keepAlive: string[]
+  /** Same order as `keepAlive`; null for labels that are not template options */
+  keepAliveCodes: (KeepAliveCode | null)[]
   /** Renewal cycle in days, or 0 if irregular */
   cycleDays: number
   /** Raw renewal cycle text */
@@ -103,6 +108,24 @@ export interface SimCard {
 
 export type ThemeSettings = Record<string, string | number | boolean>
 
+/** Interpolation values for a translatable error or warning code */
+export type ErrorParams = Record<string, string | number>
+
+/**
+ * Body of a failed API response. `code` is translated by the UI (`errors.<code>`); `error` is an
+ * English message for logs and API clients.
+ */
+export interface ApiErrorBody {
+  error: string
+  code: string
+  params?: ErrorParams
+  /** Seconds until the next attempt is allowed (429 only) */
+  retryAfter?: number
+}
+
+/** Why a sync started */
+export type SyncReason = 'startup' | 'daily' | 'settings' | 'manual'
+
 export interface SiteInfo {
   sitename: string
   version: string
@@ -127,9 +150,16 @@ export interface SyncStatus {
   lastStartedAt: string | null
   lastFinishedAt: string | null
   lastSuccessAt: string | null
+  /** English message of the last failure; installations upgraded from v0.2 may hold a Chinese one */
   lastError: string | null
+  /** Translatable code of `lastError`; null for messages written before v0.3 */
+  lastErrorCode: string | null
+  lastErrorParams: ErrorParams | null
   /** Warning when sync succeeded with some entries skipped */
   lastWarning: string | null
+  lastWarningCode: string | null
+  lastWarningParams: ErrorParams | null
+  /** A `SyncReason`, or free text written before v0.3 */
   lastReason: string | null
   cardCount: number
   recordCount: number

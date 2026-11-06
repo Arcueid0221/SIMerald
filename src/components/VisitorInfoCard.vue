@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { currentLocale } from '@/i18n'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
+const { t } = useI18n()
 
 interface VisitorGeoData {
   ip: string
@@ -12,8 +15,11 @@ interface VisitorGeoData {
   countryCode: string
 }
 
+type VisitorDevice = 'desktop' | 'android' | 'iphone' | 'ipad' | 'tablet'
+
 interface VisitorClientData {
-  device: string
+  device: VisitorDevice
+  /** Browser name, or empty when unrecognized */
   browser: string
 }
 
@@ -39,19 +45,25 @@ const IPV6_SEGMENT_REGEX = /^[\dA-F]{1,4}$/i
 const IPV6_DOUBLE_COLON = '::'
 
 const loading = ref(true)
-const device = ref('检测中')
-const browser = ref('检测中')
-const ip = ref('获取中')
-const isp = ref('获取中')
-const location = ref('正在定位访客来源')
+// Empty strings are shown as translated fallbacks once loading finishes; `geoFailed` marks a failed lookup
+const device = ref<VisitorDevice>('desktop')
+const browser = ref('')
+const ip = ref('')
+const isp = ref('')
+const location = ref('')
+const geoFailed = ref(false)
 const countryCode = ref('')
-const visitTime = ref(formatVisitTime(new Date()))
+const visitTime = ref(new Date())
 const flagVisible = ref(true)
 const expand = ref(false)
 
-const subtitle = computed(() => loading.value ? '检测中' : location.value || '网络访客')
+const subtitle = computed(() => location.value || (geoFailed.value ? t('visitor.anonymous') : t('visitor.unknownLocation')))
 const flagSrc = computed(() => countryCode.value ? `/assets/flags/${countryCode.value}.svg` : '')
-const displayIp = computed(() => expand.value ? ip.value : maskIpForCollapsedState(ip.value))
+const displayIp = computed(() => {
+  if (!ip.value)
+    return t('visitor.ipUnavailable')
+  return expand.value ? ip.value : maskIpForCollapsedState(ip.value)
+})
 
 const visitorRows = computed<VisitorInfoRow[]>(() => [
   {
@@ -59,7 +71,7 @@ const visitorRows = computed<VisitorInfoRow[]>(() => [
     icon: 'tabler:world-pin',
   },
   {
-    value: device.value,
+    value: t(`visitor.devices.${device.value}`),
     icon: 'tabler:device-desktop',
     expandOnly: true,
   },
@@ -68,16 +80,16 @@ const visitorRows = computed<VisitorInfoRow[]>(() => [
     icon: 'tabler:brand-socket-io',
   },
   {
-    value: browser.value,
+    value: browser.value || t('visitor.unknownBrowser'),
     icon: 'tabler:browser',
   },
   {
-    value: isp.value,
+    value: isp.value || (geoFailed.value ? t('visitor.networkUnavailable') : t('visitor.unknownIsp')),
     icon: 'tabler:building-skyscraper',
     expandOnly: true,
   },
   {
-    value: visitTime.value,
+    value: formatVisitTime(visitTime.value),
     icon: 'tabler:clock-hour-4',
     expandOnly: true,
   },
@@ -91,7 +103,7 @@ function getItemTransitionStyle(index: number): Record<string, string> {
 }
 
 function formatVisitTime(date: Date): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(currentLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -165,17 +177,17 @@ function isValidIpv6Segment(segment: string, index: number, segments: string[]):
 function detectClient(): VisitorClientData {
   const ua = navigator.userAgent
 
-  let detectedDevice = '桌面设备'
+  let detectedDevice: VisitorDevice = 'desktop'
   if (ANDROID_REGEX.test(ua))
-    detectedDevice = 'Android 手机'
+    detectedDevice = 'android'
   else if (IPHONE_OR_IPOD_REGEX.test(ua))
-    detectedDevice = 'iPhone'
+    detectedDevice = 'iphone'
   else if (IPAD_REGEX.test(ua))
-    detectedDevice = 'iPad'
+    detectedDevice = 'ipad'
   else if (TABLET_REGEX.test(ua))
-    detectedDevice = '平板电脑'
+    detectedDevice = 'tablet'
 
-  let detectedBrowser = '未知浏览器'
+  let detectedBrowser = ''
   const edgeMatch = ua.match(EDGE_VERSION_REGEX)
   const operaMatch = ua.match(OPERA_VERSION_REGEX)
   const chromeMatch = ua.match(CHROME_VERSION_REGEX)
@@ -239,8 +251,8 @@ async function fetchVisitorGeo(): Promise<VisitorGeoData | null> {
 
       return {
         ip: data.ip,
-        isp: data.isp || data.organization || data.asn_organization || '未知运营商',
-        location: [data.country, data.city || data.region].filter(Boolean).join(' · ') || '未知位置',
+        isp: data.isp || data.organization || data.asn_organization || '',
+        location: [data.country, data.city || data.region].filter(Boolean).join(' · '),
         countryCode: data.country_code || '',
       }
     },
@@ -265,8 +277,8 @@ async function fetchVisitorGeo(): Promise<VisitorGeoData | null> {
 
       return {
         ip: data.ip,
-        isp: data.connection?.isp || data.connection?.org || '未知运营商',
-        location: [data.country, data.city || data.region].filter(Boolean).join(' · ') || '未知位置',
+        isp: data.connection?.isp || data.connection?.org || '',
+        location: [data.country, data.city || data.region].filter(Boolean).join(' · '),
         countryCode: data.country_code || '',
       }
     },
@@ -301,11 +313,11 @@ async function fetchVisitorGeo(): Promise<VisitorGeoData | null> {
 
       return {
         ip: data.ip,
-        isp: data.asn?.org || data.company?.name || data.datacenter?.datacenter || data.asn?.descr || '未知运营商',
+        isp: data.asn?.org || data.company?.name || data.datacenter?.datacenter || data.asn?.descr || '',
         location: [
           data.location?.country || data.datacenter?.country,
           data.location?.city || data.location?.state || data.datacenter?.city || data.datacenter?.region,
-        ].filter(Boolean).join(' · ') || '未知位置',
+        ].filter(Boolean).join(' · '),
         countryCode: data.location?.country_code || data.asn?.country || data.datacenter?.country || '',
       }
     },
@@ -327,8 +339,8 @@ async function fetchVisitorGeo(): Promise<VisitorGeoData | null> {
 
       return {
         ip: data.ip,
-        isp: data.org || '未知运营商',
-        location: [data.country_name, data.city || data.region].filter(Boolean).join(' · ') || '未知位置',
+        isp: data.org || '',
+        location: [data.country_name, data.city || data.region].filter(Boolean).join(' · '),
         countryCode: data.country_code || '',
       }
     },
@@ -351,8 +363,8 @@ async function fetchVisitorGeo(): Promise<VisitorGeoData | null> {
 
       return {
         ip: data.data.ip,
-        isp: data.data.isp || '未知运营商',
-        location: [data.data.country, data.data.city || data.data.province].filter(Boolean).join(' · ') || '未知位置',
+        isp: data.data.isp || '',
+        location: [data.data.country, data.data.city || data.data.province].filter(Boolean).join(' · '),
         countryCode: data.data.countryCode || '',
       }
     },
@@ -377,7 +389,7 @@ onMounted(async () => {
   const client = detectClient()
   device.value = client.device
   browser.value = client.browser
-  visitTime.value = formatVisitTime(new Date())
+  visitTime.value = new Date()
 
   const geo = await fetchVisitorGeo()
   if (geo) {
@@ -388,9 +400,7 @@ onMounted(async () => {
     appStore.visitorCountryCode = geo.countryCode.toUpperCase()
   }
   else {
-    ip.value = '暂无法获取'
-    isp.value = '网络信息不可用'
-    location.value = '网络访客'
+    geoFailed.value = true
   }
 
   loading.value = false

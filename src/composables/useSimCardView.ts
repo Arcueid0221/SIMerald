@@ -1,7 +1,9 @@
 import type { SimCard } from '@shared/types'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useExchangeRates } from '@/composables/useExchangeRates'
 import {
+  countryName,
   daysSince,
   formatCNY,
   getKeepCost,
@@ -22,6 +24,7 @@ export interface SimInfoRow {
 /** Shared display state for all three SIM card layout variants */
 export function useSimCardView(getCard: () => SimCard) {
   const { rates } = useExchangeRates()
+  const { t } = useI18n()
 
   const card = computed(getCard)
   const validity = computed(() => getValidity(card.value))
@@ -34,25 +37,27 @@ export function useSimCardView(getCard: () => SimCard) {
   const purchaseTooltip = computed(() => {
     const held = daysSince(card.value.firstPurchaseAt)
     const amount = purchase.value.original ?? purchaseText.value
-    return held === null || held < 0 ? `首次购买 ${amount}` : `首次购买 ${amount} · 已持有 ${held} 天`
+    return held === null || held < 0
+      ? t('card.firstPurchase', { amount })
+      : `${t('card.firstPurchase', { amount })} · ${t('card.heldFor', { days: t('days.count', held) })}`
   })
 
   const keepCost = computed(() => getKeepCost(card.value, rates.value))
 
-  const subtitle = computed(() => [card.value.numberMasked, card.value.countryName].filter(Boolean).join(' · '))
+  const subtitle = computed(() => [card.value.numberMasked, countryName(card.value)].filter(Boolean).join(' · '))
 
   const inactive = computed(() => card.value.status !== 'active')
-  const inactiveLabel = computed(() => card.value.status === 'cancelled' ? '已注销' : '已过期')
+  const inactiveLabel = computed(() => t(`status.${card.value.status === 'cancelled' ? 'cancelled' : 'expired'}`))
   const inactiveDate = computed(() => (card.value.status === 'cancelled' ? card.value.cancelledAt : card.value.expiresAt) ?? '')
   const inactiveClass = computed(() => card.value.status === 'cancelled' ? 'text-slate-500' : 'text-red-600')
 
-  const expiryRow = computed<SimInfoRow>(() => ({ label: '到期', value: card.value.expiresAt ?? '-' }))
+  const expiryRow = computed<SimInfoRow>(() => ({ label: t('card.rows.expiry'), value: card.value.expiresAt ?? '-' }))
   const purchaseRow = computed<SimInfoRow>(() => ({
-    label: '购入',
+    label: t('card.rows.purchase'),
     value: purchase.value.date ? `${purchaseText.value} · ${purchase.value.date}` : purchaseText.value,
     tooltip: purchaseTooltip.value,
   }))
-  const keepRow = computed<SimInfoRow>(() => ({ label: '保号', value: keepCost.value.long, tooltip: keepCost.value.tooltip }))
+  const keepRow = computed<SimInfoRow>(() => ({ label: t('card.rows.keep'), value: keepCost.value.long, tooltip: keepCost.value.tooltip }))
 
   return {
     validity,

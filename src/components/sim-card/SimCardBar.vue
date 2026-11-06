@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { SimCard } from '@shared/types'
+import { useI18n } from 'vue-i18n'
 import CarrierLogo from '@/components/sim-card/CarrierLogo.vue'
 import SimCardShell from '@/components/sim-card/SimCardShell.vue'
 import SimInfoRows from '@/components/sim-card/SimInfoRows.vue'
@@ -8,14 +9,13 @@ import { DataTooltip } from '@/components/ui/data-tooltip'
 import { useSimCardView } from '@/composables/useSimCardView'
 import { VALIDITY_TONE_TEXT } from '@/utils/cardHelpers'
 
-/** Horizontal bar card layout, closest to the original Emerald server card */
-
 const props = defineProps<{ card: SimCard }>()
-
 const emit = defineEmits<{
   click: []
 }>()
+/** Horizontal bar card layout, closest to the original Emerald server card */
 
+const { t } = useI18n()
 const { daysClass, daysText, inactive, inactiveClass, inactiveDate, inactiveLabel, keepRow, purchaseRow, subtitle, validity, validityTooltip } = useSimCardView(() => props.card)
 </script>
 
@@ -46,9 +46,9 @@ const { daysClass, daysText, inactive, inactiveClass, inactiveDate, inactiveLabe
       <div class="flex flex-col gap-3" :class="inactive && 'pointer-events-none opacity-60 blur-xs'">
         <div class="flex flex-col gap-1">
           <div class="flex w-full justify-between text-xs">
-            <span class="text-muted-foreground">有效期</span>
+            <span class="text-muted-foreground">{{ t('card.validity') }}</span>
             <DataTooltip :content="validityTooltip" placement="left" content-class="whitespace-nowrap px-1.5 text-[11px]">
-              <span class="tabular-nums" :class="daysClass">{{ daysText }} 天</span>
+              <span class="tabular-nums" :class="daysClass">{{ daysText }}</span>
             </DataTooltip>
           </div>
           <div class="relative h-1 w-full overflow-hidden rounded-full bg-muted">
@@ -59,8 +59,8 @@ const { daysClass, daysText, inactive, inactiveClass, inactiveDate, inactiveLabe
             />
           </div>
           <div class="flex justify-between gap-2 text-[11px] text-muted-foreground">
-            <span class="truncate">至 {{ props.card.expiresAt ?? '-' }}</span>
-            <span v-if="validity.total" class="shrink-0">本期 {{ validity.total }} 天</span>
+            <span class="truncate">{{ t('card.until', { date: props.card.expiresAt ?? '-' }) }}</span>
+            <span v-if="validity.total" class="shrink-0">{{ t('card.thisPeriod', { days: t('days.count', validity.total) }) }}</span>
           </div>
         </div>
         <SimInfoRows :rows="[purchaseRow, keepRow]" />

@@ -3,6 +3,7 @@ import type { SimCard } from '@shared/types'
 import type { EChartsOption } from 'echarts/types/dist/shared'
 import { computed, onMounted, ref } from 'vue'
 import VChart from 'vue-echarts'
+import { useI18n } from 'vue-i18n'
 import { Empty } from '@/components/ui/empty'
 import { Spinner } from '@/components/ui/spinner'
 import { useAppStore } from '@/stores/app'
@@ -27,6 +28,8 @@ const props = defineProps<{
 
 const appStore = useAppStore()
 const cardsStore = useCardsStore()
+
+const { t } = useI18n()
 const displayNodes = computed(() => props.cards ?? cardsStore.cards)
 const mapName = ref<string>()
 const loading = ref(true)
@@ -239,7 +242,7 @@ onMounted(async () => {
     mapName.value = await ensureWorldMapRegistered()
   }
   catch (error) {
-    loadError.value = error instanceof Error ? error.message : '地图资源加载失败'
+    loadError.value = error instanceof Error ? error.message : 'map load failed'
   }
   finally {
     loading.value = false
@@ -278,7 +281,7 @@ onMounted(async () => {
           />
           <Empty
             v-else-if="loadError"
-            description="地图资源加载失败"
+            :description="t('globe.mapLoadFailed')"
             class="h-full"
           />
         </Spinner>

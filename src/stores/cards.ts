@@ -1,11 +1,12 @@
 import type { CardsResponse, SimCard } from '@shared/types'
+import type { Continent } from '@/utils/continentHelper'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { CONTINENTS, getContinent } from '@/utils/continentHelper'
 
 export interface CardGroup {
-  name: string
-  label: string
+  /** Continent code, also the tab value persisted in `cardSelectedGroup` */
+  name: Continent
 }
 
 const useCardsStore = defineStore('cards', () => {
@@ -20,7 +21,7 @@ const useCardsStore = defineStore('cards', () => {
   /** Continents that have at least one card, in `CONTINENTS` display order */
   const groups = computed<CardGroup[]>(() => {
     const present = new Set(cards.value.map(card => getContinent(card.region)))
-    return CONTINENTS.filter(name => present.has(name)).map(name => ({ name, label: name }))
+    return CONTINENTS.filter(name => present.has(name)).map(name => ({ name }))
   })
 
   const cardsById = computed(() => {

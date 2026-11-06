@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -8,6 +9,8 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -33,7 +36,7 @@ const props = defineProps<Props>()
       <path d="M3 14h18M8 18h.01M12 18h.01M16 18h.01" />
     </svg>
     <slot>
-      <span class="text-sm">{{ description ?? '暂无数据' }}</span>
+      <span class="text-sm">{{ description ?? t('common.noData') }}</span>
     </slot>
     <slot name="extra" />
   </div>

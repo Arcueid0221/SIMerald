@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 interface Props {
   visibilityHeight?: number
@@ -14,6 +15,8 @@ const emit = defineEmits<{
 }>()
 
 const show = ref(false)
+
+const { t } = useI18n()
 
 function handleScroll() {
   const scrolled = window.scrollY > props.visibilityHeight
@@ -47,7 +50,7 @@ onUnmounted(() => {
     <button
       v-show="show"
       class="fixed bottom-8 right-8 z-[9999] size-10 rounded-full bg-background border shadow-sm flex items-center justify-center text-foreground hover:bg-accent transition-colors"
-      aria-label="返回顶部"
+      :aria-label="t('common.backToTop')"
       @click="scrollToTop"
     >
       <svg

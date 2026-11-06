@@ -1,11 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { AdminStatus, CardsResponse, SiteInfo } from '../shared/types.ts'
+import type { AdminStatus, ApiErrorBody, CardsResponse, SiteInfo, SyncReason } from '../shared/types.ts'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import path from 'node:path'
-import { AuthError, AuthService } from './auth.ts'
+import { AuthService } from './auth.ts'
 import { loadConfig } from './config.ts'
 import { detectTemplates } from './detect.ts'
+import { AppError } from './errors.ts'
 import { LogoStore } from './logos.ts'
 import { NotionClient, NotionError } from './notion.ts'
 import { SettingsService } from './settings.ts'
@@ -60,15 +61,6 @@ const settings = new SettingsService(store, config)
 const auth = new AuthService(store)
 const sync = new SyncService(store, settings)
 const logos = new LogoStore(config.dataDir)
-
-class HttpError extends Error {
-  status: number
-
-  constructor(status: number, message: string) {
-    super(message)
-    this.status = status
-  }
-}
 
 function parseCookies(header: string | undefined): Record<string, string> {
   const result: Record<string, string> = {}
@@ -151,13 +143,13 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   const type = req.headers['content-type'] ?? ''
   if (!type.includes('application/json'))
-    throw new HttpError(415, '请求格式不对')
+    throw new AppError(415, 'http.unsupportedMediaType', 'Expected an application/json body')
   const chunks: Buffer[] = []
   let size = 0
   for await (const chunk of req) {
     size += (chunk as Buffer).length
     if (size > MAX_BODY_BYTES)
-      throw new HttpError(413, '请求内容太大')
+      throw new AppError(413, 'http.payloadTooLarge', 'Request body is too large')
     chunks.push(chunk as Buffer)
   }
   if (!chunks.length)
@@ -167,13 +159,13 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
     return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
   }
   catch {
-    throw new HttpError(400, '请求内容不是合法的 JSON')
+    throw new AppError(400, 'http.badJson', 'Request body is not valid JSON')
   }
 }
 
 function requireLogin(req: IncomingMessage): void {
   if (!isLoggedIn(req))
-    throw new HttpError(401, '请先登录')
+    throw new AppError(401, 'auth.loginRequired', 'Please log in first')
 }
 
 function siteInfo(req: IncomingMessage): SiteInfo {
@@ -206,7 +198,7 @@ function adminStatus(): AdminStatus {
   }
 }
 
-async function runSyncForResponse(reason: string): Promise<void> {
+async function runSyncForResponse(reason: SyncReason): Promise<void> {
   try {
     await sync.run(reason)
   }
@@ -224,7 +216,8 @@ const routes: Record<string, Handler> = {
 
   'GET /api/cards': (req, res) => {
     const full = isLoggedIn(req)
-    const { cards: rawCards, syncedAt, demo } = sync.getCards()
+    const lang = new URL(req.url ?? '/', 'http://localhost').searchParams.get('lang') === 'en' ? 'en' : 'zh'
+    const { cards: rawCards, syncedAt, demo } = sync.getCards(lang)
     const cards = rawCards.map(card => ({ ...card, logo: logos.urlFor(card.carrier) }))
     const body: CardsResponse = { cards: full ? cards : toPublicCards(cards), syncedAt, demo, full }
     sendJson(res, 200, body)
@@ -269,12 +262,7 @@ const routes: Record<string, Handler> = {
   'PUT /api/admin/schedule': async (req, res) => {
     requireLogin(req)
     const body = await readJsonBody(req)
-    try {
-      settings.updateSchedule(body.syncTime, body.timezone)
-    }
-    catch (error) {
-      throw new HttpError(400, (error as Error).message)
-    }
+    settings.updateSchedule(body.syncTime, body.timezone)
     sync.schedule()
     sendJson(res, 200, adminStatus())
   },
@@ -282,14 +270,9 @@ const routes: Record<string, Handler> = {
   'PUT /api/admin/notion': async (req, res) => {
     requireLogin(req)
     const body = await readJsonBody(req)
-    try {
-      settings.updateNotion(body)
-    }
-    catch (error) {
-      throw new HttpError(400, (error as Error).message)
-    }
+    settings.updateNotion(body)
     if (settings.notion.token)
-      await runSyncForResponse('Notion 设置已修改')
+      await runSyncForResponse('settings')
     sendJson(res, 200, adminStatus())
   },
 
@@ -300,15 +283,16 @@ const routes: Record<string, Handler> = {
     const typed = typeof body.token === 'string' ? body.token.trim() : ''
     const token = typed || settings.notion.token
     if (!token)
-      throw new HttpError(400, '请先填写 Notion token')
+      throw new AppError(400, 'notion.tokenRequired', 'Enter a Notion token first')
     if (typed && (typed.length < 20 || typed.length > 200))
-      throw new HttpError(400, 'Notion token 格式不对')
+      throw new AppError(400, 'notion.badToken', 'Malformed Notion token')
     try {
       sendJson(res, 200, { matches: await detectTemplates(new NotionClient(token)) })
     }
     catch (error) {
+      // Notion's own status (e.g. 401) must not reach the browser, where it would read as a lost session
       if (error instanceof NotionError)
-        throw new HttpError(400, error.message)
+        throw new AppError(400, error.appCode, error.message, error.params)
       throw error
     }
   },
@@ -316,7 +300,7 @@ const routes: Record<string, Handler> = {
   'POST /api/admin/sync': async (req, res) => {
     requireLogin(req)
     await readJsonBody(req)
-    await runSyncForResponse('手动立即同步')
+    await runSyncForResponse('manual')
     sendJson(res, 200, adminStatus())
   },
 
@@ -360,7 +344,7 @@ function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string
     decoded = decodeURIComponent(pathname)
   }
   catch {
-    throw new HttpError(400, '网址格式不对')
+    throw new AppError(400, 'http.badUrl', 'Malformed URL')
   }
   let filePath = path.resolve(root, `.${decoded}`)
   if (!filePath.startsWith(root + path.sep) && filePath !== root) {
@@ -378,7 +362,7 @@ function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string
     filePath = path.join(root, 'index.html')
     isFallback = true
     if (!existsSync(filePath)) {
-      res.writeHead(503, { ...SECURITY_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' }).end('前端还没有构建')
+      res.writeHead(503, { ...SECURITY_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' }).end('Frontend not built yet')
       return
     }
   }
@@ -424,19 +408,19 @@ const server = createServer(async (req, res) => {
       url = new URL(req.url ?? '/', 'http://localhost')
     }
     catch {
-      throw new HttpError(400, '网址格式不对')
+      throw new AppError(400, 'http.badUrl', 'Malformed URL')
     }
     if (url.pathname.startsWith('/api/') || url.pathname === '/healthz') {
       if (method !== 'GET' && method !== 'HEAD' && req.headers[CSRF_HEADER] !== '1')
-        throw new HttpError(403, '请求来源校验失败')
+        throw new AppError(403, 'http.csrf', 'Missing the X-SIMerald-Request header')
       const handler = routes[`${method === 'HEAD' ? 'GET' : method} ${url.pathname}`]
       if (!handler)
-        throw new HttpError(404, '接口不存在')
+        throw new AppError(404, 'http.notFound', 'No such API endpoint')
       await handler(req, res)
       return
     }
     if (method !== 'GET' && method !== 'HEAD')
-      throw new HttpError(405, '不支持的请求方法')
+      throw new AppError(405, 'http.methodNotAllowed', 'Method not allowed')
     if (url.pathname.startsWith('/logos/')) {
       if (!logos.serve(req, res, url.pathname, SECURITY_HEADERS))
         res.writeHead(404, { ...SECURITY_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' }).end('Not Found')
@@ -449,18 +433,16 @@ const server = createServer(async (req, res) => {
       res.end()
       return
     }
-    if (error instanceof AuthError) {
+    if (error instanceof AppError) {
       if (error.retryAfter)
         res.setHeader('Retry-After', String(error.retryAfter))
-      sendJson(res, error.status, { error: error.message, retryAfter: error.retryAfter })
-      return
-    }
-    if (error instanceof HttpError) {
-      sendJson(res, error.status, { error: error.message })
+      const body: ApiErrorBody = { error: error.message, code: error.code, params: error.params, retryAfter: error.retryAfter }
+      sendJson(res, error.status, body)
       return
     }
     console.error('[http] Unhandled error:', error)
-    sendJson(res, 500, { error: '服务器内部错误' })
+    const body: ApiErrorBody = { error: 'Internal server error', code: 'http.internal' }
+    sendJson(res, 500, body)
   }
 })
 

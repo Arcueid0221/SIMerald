@@ -2,6 +2,7 @@
 import type { AdminStatus } from '@shared/types'
 import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import LoginPanel from '@/components/admin/LoginPanel.vue'
 import NotionSection from '@/components/admin/NotionSection.vue'
@@ -16,6 +17,7 @@ import { refreshData } from '@/utils/init'
 
 const router = useRouter()
 const appStore = useAppStore()
+const { t } = useI18n()
 
 const status = ref<AdminStatus | null>(null)
 const loadingStatus = ref(false)
@@ -37,7 +39,7 @@ async function loadStatus() {
     if (e instanceof ApiError && e.status === 401)
       await refreshData().catch(() => {})
     else
-      window.$message.error(e instanceof ApiError ? e.message : '读取后台状态失败')
+      window.$message.error(e instanceof ApiError ? e.message : t('admin.statusLoadFailed'))
   }
   finally {
     loadingStatus.value = false
@@ -56,7 +58,7 @@ async function logout() {
   finally {
     status.value = null
     await refreshData().catch(() => {})
-    window.$message.success('已退出登录')
+    window.$message.success(t('admin.loggedOut'))
   }
 }
 
@@ -74,14 +76,14 @@ onMounted(() => {
 <template>
   <div class="admin-view px-4 pb-8 flex flex-col gap-4">
     <div class="flex gap-4 items-center">
-      <Button variant="ghost" size="icon-sm" class="bg-background/50 hover:bg-background" aria-label="返回首页" @click="router.push('/')">
+      <Button variant="ghost" size="icon-sm" class="bg-background/50 hover:bg-background" :aria-label="t('common.backHome')" @click="router.push('/')">
         <Icon icon="tabler:arrow-left" :width="16" :height="16" />
       </Button>
       <div class="text-lg font-bold">
-        后台管理
+        {{ t('admin.title') }}
       </div>
       <Button v-if="mode === 'settings'" variant="ghost" size="sm" class="ml-auto bg-background/50 hover:bg-background" @click="logout">
-        <Icon icon="tabler:logout" /> 退出登录
+        <Icon icon="tabler:logout" /> {{ t('admin.logout') }}
       </Button>
     </div>
 
@@ -89,7 +91,7 @@ onMounted(() => {
     <LoginPanel v-else-if="mode === 'login'" @done="handleLoggedIn" />
     <template v-else>
       <div v-if="!status" class="py-12 text-center text-sm text-muted-foreground">
-        {{ loadingStatus ? '正在读取…' : '读取失败，请刷新页面' }}
+        {{ loadingStatus ? t('admin.loading') : t('admin.loadFailed') }}
       </div>
       <template v-else>
         <SyncSection :status="status" @update="status = $event" />

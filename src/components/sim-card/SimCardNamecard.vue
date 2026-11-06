@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { SimCard } from '@shared/types'
+import { useI18n } from 'vue-i18n'
 import CarrierLogo from '@/components/sim-card/CarrierLogo.vue'
 import SimCardShell from '@/components/sim-card/SimCardShell.vue'
 import StatusDot from '@/components/sim-card/StatusDot.vue'
@@ -7,14 +8,13 @@ import ValidityRing from '@/components/sim-card/ValidityRing.vue'
 import { DataTooltip } from '@/components/ui/data-tooltip'
 import { useSimCardView } from '@/composables/useSimCardView'
 
-/** Vertical namecard layout: centered logo inside a validity ring with a 3-column footer */
-
 const props = defineProps<{ card: SimCard }>()
-
 const emit = defineEmits<{
   click: []
 }>()
+/** Vertical namecard layout: centered logo inside a validity ring with a 3-column footer */
 
+const { t } = useI18n()
 const { daysClass, daysText, inactive, inactiveClass, inactiveDate, inactiveLabel, keepCost, purchaseText, purchaseTooltip, subtitle, validity, validityTooltip } = useSimCardView(() => props.card)
 </script>
 
@@ -50,17 +50,17 @@ const { daysClass, daysText, inactive, inactiveClass, inactiveDate, inactiveLabe
         <div v-else class="grid grid-cols-3 border-t-2 border-dotted border-gray-500/10 pt-3.5 dark:border-white/8">
           <div class="min-w-0 px-1">
             <div class="text-[11px] text-muted-foreground">
-              剩余
+              {{ t('card.remaining') }}
             </div>
             <DataTooltip :content="validityTooltip" placement="top" class="max-w-full" content-class="whitespace-nowrap px-1.5 text-[11px]">
               <div class="mt-0.5 truncate text-[13px] font-medium tabular-nums" :class="daysClass">
-                {{ daysText }} 天
+                {{ daysText }}
               </div>
             </DataTooltip>
           </div>
           <div class="min-w-0 border-l border-border px-1">
             <div class="text-[11px] text-muted-foreground">
-              每年保号
+              {{ t('card.keepPerYear') }}
             </div>
             <DataTooltip :content="keepCost.tooltip" placement="top" class="max-w-full" content-class="whitespace-nowrap px-1.5 text-[11px]">
               <div class="mt-0.5 truncate text-[13px] font-medium tabular-nums">
@@ -70,7 +70,7 @@ const { daysClass, daysText, inactive, inactiveClass, inactiveDate, inactiveLabe
           </div>
           <div class="min-w-0 border-l border-border px-1">
             <div class="text-[11px] text-muted-foreground">
-              购入
+              {{ t('card.rows.purchase') }}
             </div>
             <DataTooltip :content="purchaseTooltip" placement="top" class="max-w-full" content-class="whitespace-nowrap px-1.5 text-[11px]">
               <div class="mt-0.5 truncate text-[13px] font-medium tabular-nums">

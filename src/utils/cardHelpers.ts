@@ -1,13 +1,20 @@
 import type { CardStatus, SimCard, SimRecord } from '@shared/types'
+import type { AppLocale } from '@/i18n'
 import type { ExchangeRates } from '@/utils/financeHelper'
 import dayjs from 'dayjs'
+import { compareText, currentLocale, formatNumber, i18n } from '@/i18n'
 import { CURRENCY_SYMBOLS, normalizeCurrency } from '@/utils/financeHelper'
+import { getRegionCode } from '@/utils/regionHelper'
+import { parseBillingCycleType } from '@/utils/tagHelper'
+
+const { t } = i18n.global
 
 /** Expiry thresholds matching Emerald: <7 days critical (red), <15 days warning (yellow) */
 const CRITICAL_DAYS = 7
 const WARNING_DAYS = 15
 const LONG_TERM_DAYS = 36500
 const LEADING_ESIM_REGEX = /^eSIM\s*[·•]\s*/i
+const REGION_CODE_REGEX = /^[A-Z]{2}$/
 
 export type RenewalState = 'overdue' | 'critical' | 'warning' | 'normal' | 'long_term' | 'none'
 export type BarStatus = 'default' | 'success' | 'warning' | 'error' | 'info'
@@ -105,20 +112,20 @@ export function getValidity(card: SimCard): ValidityInfo {
   return { left, total, ratio, tone, hot: ratio <= 0.5 }
 }
 
-/** Numeric portion of remaining days (the "天" unit is rendered separately by the UI) */
+/** Remaining days with unit, e.g. `120 天` / `过期 3 天` */
 export function getValidityDaysText(validity: ValidityInfo): string {
   if (validity.left === null)
     return '-'
-  return validity.left < 0 ? `过期 ${-validity.left}` : String(validity.left)
+  return validity.left < 0 ? t('days.overdue', -validity.left) : t('days.count', validity.left)
 }
 
 export function getValidityTooltip(card: SimCard, validity: ValidityInfo): string {
   if (card.status === 'cancelled')
-    return card.cancelledAt ? `${card.cancelledAt} 注销` : '已注销'
+    return card.cancelledAt ? t('validity.cancelledOn', { date: card.cancelledAt }) : t('status.cancelled')
   if (validity.left === null)
-    return '没有有效期记录'
-  const end = card.expiresAt ?? card.nextRenewalAt
-  return `本期 ${validity.total} 天，还剩 ${Math.max(validity.left, 0)} 天 · 至 ${end}`
+    return t('validity.noRecord')
+  const end = card.expiresAt ?? card.nextRenewalAt ?? ''
+  return t('validity.tooltip', { total: t('days.count', validity.total), left: t('days.count', Math.max(validity.left, 0)), end })
 }
 
 export function isPurchaseRecord(record: SimRecord): boolean {
@@ -147,7 +154,7 @@ export function getPurchase(card: SimCard): PurchaseInfo {
 }
 
 export interface KeepCostInfo {
-  /** Compact label for cards: `¥243` / `免费` / `不固定` */
+  /** Compact label for cards: `¥243` / `免费` / `不固定` (Chinese UI) */
   short: string
   /** Label with unit: `¥243/年` / `免费保号` / `周期不固定` */
   long: string
@@ -155,54 +162,106 @@ export interface KeepCostInfo {
   tooltip: string
 }
 
-/** Estimated annual keep-alive cost in CNY; computed even for cancelled cards (masked by the UI) */
-export function getKeepCost(card: SimCard, rates: ExchangeRates): KeepCostInfo {
-  const how = card.keepAlive.join('、') || '未记录保号方式'
-  if (card.cycleDays <= 0)
-    return { short: '不固定', long: '周期不固定', tooltip: `周期不固定 · ${how}` }
-  if (card.price <= 0)
-    return { short: '免费', long: '免费保号', tooltip: `每 ${card.cycleDays} 天免费 · ${how}` }
-  const yearly = formatCNY(getPriceCNY(card, rates) / card.cycleDays * 365, 0)
-  return {
-    short: yearly,
-    long: `${yearly}/年`,
-    tooltip: `${formatAmount(card.price, card.currency)} / ${card.cycleDays} 天 · ${how}`,
+/** Joins a list of labels with the separator of the current language (`、` / `, `) */
+export function joinList(items: string[]): string {
+  return items.join(t('common.listSeparator'))
+}
+
+/** Keep-alive actions in the current language; labels that are not template options stay as written in Notion */
+export function keepAliveLabels(card: SimCard): string[] {
+  return card.keepAlive.map((label, index) => {
+    const code = card.keepAliveCodes?.[index]
+    return code ? t(`keepAlive.${code}`) : label
+  })
+}
+
+/** Renewal cycle in the current language, e.g. `每 365 天`; irregular cycles read `不固定` */
+export function cycleText(card: SimCard): string {
+  if (card.cycleDays > 0)
+    return t('cycle.every', card.cycleDays)
+  return card.cycleLabel ? t('cycle.varies') : '-'
+}
+
+/** Billing period for price units, e.g. `年` / `year`; cycles that are not a standard period read as days */
+export function billingPeriodText(cycleDays: number): string {
+  const type = parseBillingCycleType(cycleDays)
+  return type === 'custom' || type === 'once' ? t('days.count', cycleDays) : t(`billingPeriod.${type}`)
+}
+
+export function recordKindLabel(record: SimRecord): string {
+  if (record.kind === 'other')
+    return record.type || t('recordKinds.other')
+  return t(`recordKinds.${record.kind}`)
+}
+
+// Intl names for these regions carry a political qualifier ("中国香港特别行政区", "Hong Kong SAR China"); use the short forms
+const REGION_NAME_OVERRIDES: Record<AppLocale, Record<string, string>> = {
+  'zh-CN': { HK: '中国香港', MO: '中国澳门', TW: '中国台湾' },
+  'en': { HK: 'Hong Kong', MO: 'Macao', TW: 'Taiwan' },
+}
+
+const regionNames = new Map<AppLocale, Intl.DisplayNames>()
+
+/** Country name in the current language from the flag emoji, falling back to the name written in Notion */
+export function countryName(card: SimCard): string {
+  if (!card.region)
+    return card.countryName
+  const code = getRegionCode(card.region).toUpperCase()
+  if (!REGION_CODE_REGEX.test(code))
+    return card.countryName
+  const locale = currentLocale()
+  const override = REGION_NAME_OVERRIDES[locale][code]
+  if (override)
+    return override
+  let names = regionNames.get(locale)
+  if (!names) {
+    names = new Intl.DisplayNames([locale], { type: 'region', fallback: 'code' })
+    regionNames.set(locale, names)
+  }
+  try {
+    const name = names.of(code)
+    return name && name !== code ? name : card.countryName
+  }
+  catch {
+    return card.countryName
   }
 }
 
-export function getRenewalDaysText(card: SimCard): string {
-  if (card.status === 'cancelled')
-    return '已注销'
-  const days = getRenewalDays(card)
-  if (days === null)
-    return '-'
-  if (days < 0)
-    return `过期 ${-days} 天`
-  if (days === 0)
-    return '今天'
-  return `${days} 天`
+/** Estimated annual keep-alive cost in CNY; computed even for cancelled cards (masked by the UI) */
+export function getKeepCost(card: SimCard, rates: ExchangeRates): KeepCostInfo {
+  const how = joinList(keepAliveLabels(card)) || t('keepCost.noMethod')
+  if (card.cycleDays <= 0)
+    return { short: t('keepCost.variesShort'), long: t('keepCost.varies'), tooltip: `${t('keepCost.varies')} · ${how}` }
+  if (card.price <= 0)
+    return { short: t('keepCost.freeShort'), long: t('keepCost.free'), tooltip: `${t('keepCost.freeEvery', card.cycleDays)} · ${how}` }
+  const yearly = formatCNY(getPriceCNY(card, rates) / card.cycleDays * 365, 0)
+  return {
+    short: yearly,
+    long: t('keepCost.perYear', { amount: yearly }),
+    tooltip: `${t('keepCost.perCycle', { amount: formatAmount(card.price, card.currency), days: t('days.count', card.cycleDays) })} · ${how}`,
+  }
 }
 
 export function formatAmount(amount: number, currency: string): string {
   const code = normalizeCurrency(currency)
   const symbol = CURRENCY_SYMBOLS[code]
   const digits = Math.abs(amount) >= 1000 || Number.isInteger(amount) ? 0 : 2
-  return `${symbol}${new Intl.NumberFormat('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: 2 }).format(amount)}`
+  return `${symbol}${formatNumber(amount, { minimumFractionDigits: digits, maximumFractionDigits: 2 })}`
 }
 
 export function formatCNY(amount: number, digits = 2): string {
-  return `¥${new Intl.NumberFormat('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount)}`
+  return `¥${formatNumber(amount, { minimumFractionDigits: digits, maximumFractionDigits: digits })}`
 }
 
 /** Balance sufficiency for the next renewal; 100% when balance >= renewal price */
 export function getBalanceInfo(card: SimCard): { text: string, percent: number, status: BarStatus, sub: string } {
   if (card.balance == null) {
-    return { text: '-', percent: 0, status: 'default', sub: '未记录余额' }
+    return { text: '-', percent: 0, status: 'default', sub: t('balance.none') }
   }
   const updatedDays = daysSince(card.balanceUpdatedAt)
   const sub = updatedDays === null
-    ? '未记录更新时间'
-    : updatedDays <= 0 ? '今天更新' : `${updatedDays} 天前更新`
+    ? t('balance.noUpdateDate')
+    : updatedDays <= 0 ? t('balance.updatedToday') : t('balance.updatedDaysAgo', { days: t('days.count', updatedDays) })
   let percent = 100
   if (card.price > 0)
     percent = Math.max(0, Math.min(100, card.balance / card.price * 100))
@@ -219,11 +278,11 @@ export function isBalanceStale(card: SimCard): boolean {
 export function getHoldInfo(card: SimCard): { days: number | null, percent: number, sub: string } {
   const days = daysSince(card.firstPurchaseAt)
   if (days === null || days < 0)
-    return { days: null, percent: 0, sub: '未记录入手日期' }
+    return { days: null, percent: 0, sub: t('hold.noDate') }
   return {
     days,
     percent: (days % 365) / 365 * 100,
-    sub: `${dayjs(card.firstPurchaseAt).format('YYYY-MM-DD')} 入手`,
+    sub: t('hold.since', { date: dayjs(card.firstPurchaseAt).format('YYYY-MM-DD') }),
   }
 }
 
@@ -237,7 +296,7 @@ export function getPriceCNY(card: SimCard, rates: ExchangeRates): number {
 }
 
 export function shortTypeLabel(type: string): string {
-  return type.replace(LEADING_ESIM_REGEX, '').trim() || type || '未分类'
+  return type.replace(LEADING_ESIM_REGEX, '').trim() || type || t('card.uncategorized')
 }
 
 export function getNumberDisplay(card: SimCard): string {
@@ -245,7 +304,7 @@ export function getNumberDisplay(card: SimCard): string {
 }
 
 export function statusText(status: CardStatus): string {
-  return status === 'active' ? '使用中' : status === 'expired' ? '已过期' : '已注销'
+  return t(`status.${status}`)
 }
 
 export function sortCards(cards: SimCard[], mode: string): SimCard[] {
@@ -254,9 +313,9 @@ export function sortCards(cards: SimCard[], mode: string): SimCard[] {
     case 'notion':
       return list.sort((a, b) => a.order - b.order)
     case 'name':
-      return list.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+      return list.sort((a, b) => compareText(a.name, b.name))
     case 'country':
-      return list.sort((a, b) => a.countryName.localeCompare(b.countryName, 'zh-CN') || a.name.localeCompare(b.name, 'zh-CN'))
+      return list.sort((a, b) => compareText(countryName(a), countryName(b)) || compareText(a.name, b.name))
     case 'renewal':
     default:
       return list.sort((a, b) => {

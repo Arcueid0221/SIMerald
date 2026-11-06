@@ -15,6 +15,7 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 let lastRefreshAt = 0
 let visibilityHandler: (() => void) | null = null
 let stopTitleWatch: (() => void) | null = null
+let stopLocaleWatch: (() => void) | null = null
 
 export async function refreshData(): Promise<void> {
   const appStore = useAppStore()
@@ -47,6 +48,19 @@ export async function initApp(): Promise<void> {
     document.title = name
   }, { immediate: true })
 
+  // Demo cards are generated in the UI language, so switching language reloads them
+  stopLocaleWatch = watch(() => appStore.locale, async () => {
+    const cardsStore = useCardsStore()
+    if (!cardsStore.demo)
+      return
+    try {
+      cardsStore.setCards(await api.getCards())
+    }
+    catch (error) {
+      console.error('[init] Failed to reload demo cards:', error)
+    }
+  })
+
   refreshTimer = setInterval(() => {
     if (document.visibilityState === 'visible')
       refreshData().catch(() => {})
@@ -68,4 +82,6 @@ export function destroyInitManager(): void {
   visibilityHandler = null
   stopTitleWatch?.()
   stopTitleWatch = null
+  stopLocaleWatch?.()
+  stopLocaleWatch = null
 }

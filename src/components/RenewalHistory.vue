@@ -2,11 +2,12 @@
 import type { RecordKind, SimCard, SimRecord } from '@shared/types'
 import { computed } from 'vue'
 import VChart from 'vue-echarts'
+import { useI18n } from 'vue-i18n'
 import { CardX } from '@/components/ui/card-x'
 import { Empty } from '@/components/ui/empty'
 import { useBackgroundSurface } from '@/composables/useBackgroundSurface'
 import { useAppStore } from '@/stores/app'
-import { formatAmount, formatCNY } from '@/utils/cardHelpers'
+import { formatAmount, formatCNY, joinList, recordKindLabel } from '@/utils/cardHelpers'
 import '@/utils/echarts'
 
 /**
@@ -20,6 +21,7 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
+const { t } = useI18n()
 const { pickSurfaceClass } = useBackgroundSurface()
 const isDark = computed(() => appStore.isDark)
 
@@ -47,7 +49,7 @@ function recordAmountText(record: SimRecord): string {
   if (record.amount === null)
     return '-'
   if (record.amount === 0)
-    return '免费'
+    return t('history.free')
   return formatAmount(record.amount, record.currency)
 }
 
@@ -71,9 +73,9 @@ const chartOption = computed(() => ({
       const color = TYPE_COLORS[record.kind]
       return [
         `<div style="font-weight:600">${record.date}</div>`,
-        `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color}"></span>${record.type || '消费'}</div>`,
+        `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color}"></span>${recordKindLabel(record)}</div>`,
         `<div>${recordAmountText(record)}${record.amountCNY !== null && record.currency !== 'CNY' && record.amount ? ` ≈ ${formatCNY(record.amountCNY)}` : ''}</div>`,
-        record.extendsTo ? `<div style="color:${chartThemeColors.value.textSecondary}">有效期延至 ${record.extendsTo}</div>` : '',
+        record.extendsTo ? `<div style="color:${chartThemeColors.value.textSecondary}">${t('history.extendsTo', { date: record.extendsTo })}</div>` : '',
       ].join('')
     },
   },
@@ -110,9 +112,9 @@ const chartOption = computed(() => ({
   >
     <template #header>
       <div class="flex items-center justify-between">
-        <span class="text-base font-bold">续费历史</span>
+        <span class="text-base font-bold">{{ t('history.title') }}</span>
         <div class="text-xs flex gap-1 items-baseline text-muted-foreground">
-          <span>{{ records.length }} 笔</span>
+          <span>{{ t('history.count', records.length) }}</span>
           <span>·</span>
           <span class="text-foreground">{{ formatCNY(props.card.totalSpentCNY ?? 0) }}</span>
         </div>
@@ -120,39 +122,39 @@ const chartOption = computed(() => ({
     </template>
 
     <div v-if="records.length === 0" class="py-4">
-      <Empty description="还没有消费记录" />
+      <Empty :description="t('history.empty')" />
     </div>
     <div v-else class="flex flex-col gap-3">
       <div class="h-48">
         <VChart :option="chartOption" autoresize />
       </div>
       <div class="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-        <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS.purchase }" />首次购买</span>
-        <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS.renewal }" />续费 / 保号</span>
-        <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS.topup }" />额外充值</span>
-        <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS.other }" />其他</span>
+        <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS.purchase }" />{{ t('history.legend.purchase') }}</span>
+        <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS.renewal }" />{{ t('history.legend.renewal') }}</span>
+        <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS.topup }" />{{ t('history.legend.topup') }}</span>
+        <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS.other }" />{{ t('history.legend.other') }}</span>
       </div>
       <div class="overflow-x-auto -mx-1 px-1">
         <table class="w-full min-w-[520px] text-xs">
           <thead>
             <tr class="text-muted-foreground text-left">
               <th class="font-normal py-1.5 pr-3">
-                日期
+                {{ t('history.columns.date') }}
               </th>
               <th class="font-normal py-1.5 pr-3">
-                类型
+                {{ t('history.columns.type') }}
               </th>
               <th class="font-normal py-1.5 pr-3 text-right">
-                金额
+                {{ t('history.columns.amount') }}
               </th>
               <th class="font-normal py-1.5 pr-3 text-right">
-                等额人民币
+                {{ t('history.columns.amountCNY') }}
               </th>
               <th class="font-normal py-1.5 pr-3">
-                有效期延至
+                {{ t('history.columns.extendsTo') }}
               </th>
               <th v-if="showAccounts" class="font-normal py-1.5">
-                扣款账户
+                {{ t('history.columns.accounts') }}
               </th>
             </tr>
           </thead>
@@ -164,7 +166,7 @@ const chartOption = computed(() => ({
               <td class="py-1.5 pr-3 whitespace-nowrap">
                 <span class="inline-flex items-center gap-1.5">
                   <span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS[record.kind] }" />
-                  {{ record.type || '-' }}
+                  {{ recordKindLabel(record) }}
                 </span>
               </td>
               <td class="py-1.5 pr-3 text-right whitespace-nowrap">
@@ -177,7 +179,7 @@ const chartOption = computed(() => ({
                 {{ record.extendsTo ?? '-' }}
               </td>
               <td v-if="showAccounts" class="py-1.5 whitespace-nowrap text-muted-foreground">
-                {{ record.accounts?.join('、') || '-' }}
+                {{ joinList(record.accounts ?? []) || '-' }}
               </td>
             </tr>
           </tbody>

@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { detectKind, parseCountry, parseCurrency, parseCycleDays } from '../../server/cards.ts'
 import { checkFields } from '../../server/fieldcheck.ts'
-import { PRESETS, resolveRecordKind } from '../../server/mapping.ts'
+import { PRESETS, resolveKeepAliveCode, resolveRecordKind } from '../../server/mapping.ts'
 import {
   CURRENCIES,
   DATABASES,
@@ -66,6 +66,12 @@ function check(): string[] {
       const kind = resolveRecordKind(option.name[lang], preset)
       if (kind !== option.key)
         problems.push(`[${lang}] record type "${option.name[lang]}" resolves to ${kind}, expected ${option.key}`)
+    }
+
+    for (const option of findColumn('cards', 'keepAlive').options!) {
+      const code = resolveKeepAliveCode(option.name[lang], preset)
+      if (code !== option.key)
+        problems.push(`[${lang}] keep-alive "${option.name[lang]}" resolves to ${code}, expected ${option.key}`)
     }
 
     for (const option of findColumn('cards', 'type').options!) {

@@ -1,12 +1,13 @@
 import type { SiteInfo } from '@shared/types'
+import type { AppLocale } from '@/i18n'
 import type { ByteDecimalsConfig } from '@/utils/helper'
 import { usePreferredDark, useStorageAsync } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { browserLocale, isAppLocale, setLocale } from '@/i18n'
 import { safeUrl } from '@/utils/helper'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
-type Lang = 'zh-CN' | 'en-US'
 export type CardStyle = 'namecard' | 'dial' | 'bar'
 type SortMode = 'renewal' | 'notion' | 'name' | 'country'
 type EarthViewMode = 'earth' | 'earth-stop' | 'maps' | 'cards' | 'hide'
@@ -39,7 +40,6 @@ const useAppStore = defineStore('app', () => {
 
   // 使用 VueUse 的 useStorageAsync 实现自动持久化
   const themeMode = useStorageAsync<ThemeMode>('themeMode', 'auto', localStorage)
-  const lang = ref<Lang>('zh-CN')
   const publicSettings = ref<SiteInfo>()
   const nodeSelectedGroup = useStorageAsync<string>('cardSelectedGroup', 'all', localStorage)
   const isLoggedIn = ref<boolean>(false)
@@ -72,6 +72,23 @@ const useAppStore = defineStore('app', () => {
   })
 
   const sitename = computed<string>(() => publicSettings.value?.sitename || 'SIMerald')
+
+  // Visitor-selected UI language; null falls back to the site default, then to the browser language
+  const storedLocale = useStorageAsync<AppLocale | null>('locale', null, localStorage)
+
+  const defaultLocale = computed<AppLocale>(() => {
+    const setting = publicSettings.value?.theme_settings?.defaultLanguage
+    return isAppLocale(setting) ? setting : browserLocale()
+  })
+
+  const locale = computed<AppLocale>({
+    get: () => isAppLocale(storedLocale.value) ? storedLocale.value : defaultLocale.value,
+    set: (val) => {
+      storedLocale.value = val
+    },
+  })
+
+  watch(locale, setLocale, { immediate: true })
 
   // 字节格式化精度（固定配置）
   const byteDecimals: ByteDecimalsConfig = { ...BYTE_DECIMALS }
@@ -301,7 +318,7 @@ const useAppStore = defineStore('app', () => {
     themeMode,
     isDark,
     resolvedThemeMode,
-    lang,
+    locale,
     nodeSelectedGroup,
     cardStyle,
     defaultCardStyle,

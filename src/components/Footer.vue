@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { DataTooltip } from '@/components/ui/data-tooltip'
 import VisitorInfoCard from '@/components/VisitorInfoCard.vue'
 import { useAppStore } from '@/stores/app'
@@ -8,14 +9,15 @@ import { formatDateTime } from '@/utils/helper'
 
 const appStore = useAppStore()
 const cardsStore = useCardsStore()
+const { t } = useI18n()
 
 const buildVersion = __BUILD_VERSION__
 const buildGitHash = __BUILD_GIT_HASH__
 
 const syncedText = computed(() => {
   if (cardsStore.demo)
-    return '演示数据'
-  return cardsStore.syncedAt ? `数据更新于 ${formatDateTime(cardsStore.syncedAt, 'YYYY-MM-DD HH:mm')}` : '数据尚未同步'
+    return t('footer.demo')
+  return cardsStore.syncedAt ? t('footer.syncedAt', { time: formatDateTime(cardsStore.syncedAt, 'YYYY-MM-DD HH:mm') }) : t('footer.notSynced')
 })
 
 const showIcp = computed(() => appStore.icpEnabled && appStore.icpNumber)

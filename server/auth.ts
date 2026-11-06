@@ -1,5 +1,6 @@
 import type { JsonStore } from './storage.ts'
 import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto'
+import { AppError } from './errors.ts'
 
 /**
  * Owner authentication: scrypt password hash + TOTP 2FA + one-time recovery codes.
@@ -60,16 +61,8 @@ interface AuthData {
   pending: PendingTotp | null
 }
 
-export class AuthError extends Error {
-  status: number
-  retryAfter?: number
-
-  constructor(status: number, message: string, retryAfter?: number) {
-    super(message)
-    this.status = status
-    this.retryAfter = retryAfter
-  }
-}
+/** Authentication failure; kept as its own name so callers can tell it apart from other errors */
+export class AuthError extends AppError {}
 
 export interface NewSession {
   token: string
@@ -192,9 +185,9 @@ function normalizeRecoveryCode(code: string): string {
 
 function validatePassword(password: unknown): string {
   if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH)
-    throw new AuthError(400, `密码至少 ${MIN_PASSWORD_LENGTH} 位`)
+    throw new AuthError(400, 'auth.passwordTooShort', `Password must be at least ${MIN_PASSWORD_LENGTH} characters`, { min: MIN_PASSWORD_LENGTH })
   if (password.length > 256)
-    throw new AuthError(400, '密码太长')
+    throw new AuthError(400, 'auth.passwordTooLong', 'Password is too long')
   return password
 }
 
@@ -247,12 +240,12 @@ export class AuthService {
     const now = Date.now()
     const entry = this.ipFails.get(ip)
     if (entry && entry.lockedUntil > now)
-      throw new AuthError(429, '尝试次数过多，请稍后再试', Math.ceil((entry.lockedUntil - now) / 1000))
+      throw new AuthError(429, 'auth.tooManyAttempts', 'Too many attempts, try again later', {}, Math.ceil((entry.lockedUntil - now) / 1000))
 
     this.globalFails = this.globalFails.filter(t => now - t < GLOBAL_WINDOW_MS)
     if (this.globalFails.length >= GLOBAL_MAX_FAILS) {
       const oldest = this.globalFails[0] ?? now
-      throw new AuthError(429, '尝试次数过多，请稍后再试', Math.ceil((oldest + GLOBAL_WINDOW_MS - now) / 1000))
+      throw new AuthError(429, 'auth.tooManyAttempts', 'Too many attempts, try again later', {}, Math.ceil((oldest + GLOBAL_WINDOW_MS - now) / 1000))
     }
   }
 
@@ -358,7 +351,7 @@ export class AuthService {
     const passwordOk = typeof password === 'string' && !!this.data.passwordHash && verifyPassword(password, this.data.passwordHash)
     if (!passwordOk || !this.verifySecondFactor(code)) {
       this.recordFail(ip)
-      throw new AuthError(401, '密码或验证码错误')
+      throw new AuthError(401, 'auth.badCredentials', 'Wrong password or code')
     }
     this.recordSuccess(ip)
   }
@@ -386,11 +379,11 @@ export class AuthService {
   private takePending(token: unknown, purpose: PendingTotp['purpose']): PendingTotp {
     const pending = this.data.pending
     if (!pending || pending.purpose !== purpose || typeof token !== 'string' || !safeEqual(pending.tokenHash, sha256(token)))
-      throw new AuthError(400, '设置流程已失效，请重新开始')
+      throw new AuthError(400, 'auth.setupInvalid', 'Setup session is no longer valid, start again')
     if (pending.expiresAt < Date.now()) {
       this.data.pending = null
       this.save()
-      throw new AuthError(400, '设置流程已超时，请重新开始')
+      throw new AuthError(400, 'auth.setupExpired', 'Setup session expired, start again')
     }
     return pending
   }
@@ -399,12 +392,12 @@ export class AuthService {
 
   beginSetup(ip: string, setupKey: unknown, password: unknown): TotpEnrollment {
     if (!this.isSetupRequired())
-      throw new AuthError(409, '站长账号已经设置过了')
+      throw new AuthError(409, 'auth.alreadySetUp', 'The owner account is already set up')
     this.checkLock(ip)
     const key = typeof setupKey === 'string' ? setupKey.trim().toUpperCase() : ''
     if (!this.data.setupKey || !safeEqual(key, this.data.setupKey)) {
       this.recordFail(ip)
-      throw new AuthError(401, '设置密钥不正确')
+      throw new AuthError(401, 'auth.badSetupKey', 'Wrong setup key')
     }
     const validPassword = validatePassword(password)
     this.recordSuccess(ip)
@@ -413,13 +406,13 @@ export class AuthService {
 
   finishSetup(ip: string, token: unknown, code: unknown): { session: NewSession, recoveryCodes: string[] } {
     if (!this.isSetupRequired())
-      throw new AuthError(409, '站长账号已经设置过了')
+      throw new AuthError(409, 'auth.alreadySetUp', 'The owner account is already set up')
     this.checkLock(ip)
     const pending = this.takePending(token, 'setup')
     const counter = typeof code === 'string' ? matchTotp(pending.secret, code.trim(), 0) : null
     if (counter === null) {
       this.recordFail(ip)
-      throw new AuthError(401, '验证码不正确，请确认手机时间准确后重试')
+      throw new AuthError(401, 'auth.badTotp', 'Wrong verification code; check that the phone clock is accurate')
     }
     this.data.passwordHash = pending.passwordHash ?? null
     this.data.totpSecret = pending.secret
@@ -429,7 +422,7 @@ export class AuthService {
     const recoveryCodes = this.generateRecoveryCodes()
     this.data.sessions = []
     this.save()
-    this.store.writeText(SETUP_KEY_FILE, '站长账号已设置，这个密钥已作废。\n')
+    this.store.writeText(SETUP_KEY_FILE, 'The owner account is set up; this key is no longer valid.\n')
     console.log('[auth] Owner account setup completed')
     return { session: this.createSession(false), recoveryCodes }
   }
@@ -438,7 +431,7 @@ export class AuthService {
 
   login(ip: string, password: unknown, code: unknown, remember: unknown): NewSession {
     if (this.isSetupRequired())
-      throw new AuthError(409, '请先完成首次设置')
+      throw new AuthError(409, 'auth.setupRequired', 'Finish the initial setup first')
     this.checkLock(ip)
     const passwordOk = typeof password === 'string' && password.length <= 256
       && verifyPassword(password, this.data.passwordHash!)
@@ -446,7 +439,7 @@ export class AuthService {
     if (!passwordOk || !this.verifySecondFactor(code)) {
       this.recordFail(ip)
       console.warn(`[auth] Login failed: ${ip}`)
-      throw new AuthError(401, '密码或验证码错误')
+      throw new AuthError(401, 'auth.badCredentials', 'Wrong password or code')
     }
     this.recordSuccess(ip)
     console.log(`[auth] Login succeeded: ${ip}`)
@@ -475,7 +468,7 @@ export class AuthService {
     const counter = typeof code === 'string' ? matchTotp(pending.secret, code.trim(), 0) : null
     if (counter === null) {
       this.recordFail(ip)
-      throw new AuthError(401, '验证码不正确，请确认手机时间准确后重试')
+      throw new AuthError(401, 'auth.badTotp', 'Wrong verification code; check that the phone clock is accurate')
     }
     this.data.totpSecret = pending.secret
     this.data.totpLastCounter = counter

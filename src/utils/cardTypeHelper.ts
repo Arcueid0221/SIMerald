@@ -1,17 +1,11 @@
 import type { CardKind, NotionColor } from '@shared/types'
+import { i18n } from '@/i18n'
 
 const KIND_ICONS: Record<CardKind, string> = {
   physical: 'tabler:device-sim',
   adapter: 'tabler:device-sd-card',
   embedded: 'tabler:device-mobile',
   virtual: 'tabler:cloud',
-}
-
-const KIND_NAMES: Record<CardKind, string> = {
-  physical: '实体 SIM',
-  adapter: 'eSIM 卡托',
-  embedded: '手机内置 eSIM',
-  virtual: '虚拟号码',
 }
 
 /** Maps Notion select-option colors to Tailwind text color classes */
@@ -33,7 +27,7 @@ export function getKindIcon(kind: CardKind): string {
 }
 
 export function getKindName(kind: CardKind): string {
-  return KIND_NAMES[kind] ?? KIND_NAMES.physical
+  return i18n.global.t(`cardKinds.${kind in KIND_ICONS ? kind : 'physical'}`)
 }
 
 export function getTypeColorClass(color: NotionColor): string {

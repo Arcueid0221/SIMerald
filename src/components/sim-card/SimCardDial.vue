@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SimCard } from '@shared/types'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import CarrierLogo from '@/components/sim-card/CarrierLogo.vue'
 import SimCardShell from '@/components/sim-card/SimCardShell.vue'
 import SimInfoRows from '@/components/sim-card/SimInfoRows.vue'
@@ -9,14 +10,13 @@ import ValidityRing from '@/components/sim-card/ValidityRing.vue'
 import { DataTooltip } from '@/components/ui/data-tooltip'
 import { useSimCardView } from '@/composables/useSimCardView'
 
-/** Dial card layout: header with a circular remaining-days gauge and dotted info rows */
-
 const props = defineProps<{ card: SimCard }>()
-
 const emit = defineEmits<{
   click: []
 }>()
+/** Dial card layout: header with a circular remaining-days gauge and dotted info rows */
 
+const { t } = useI18n()
 const { daysClass, expiryRow, inactive, keepRow, purchaseRow, subtitle, validity, validityTooltip } = useSimCardView(() => props.card)
 
 /** The ring only fits a number; clamp negative days to 0 and rely on color/tooltip for expired state */
@@ -43,13 +43,13 @@ const dialNumber = computed(() => {
       </div>
       <DataTooltip :content="validityTooltip" placement="top" content-class="whitespace-nowrap px-1.5 text-[11px]">
         <ValidityRing :size="46" :stroke="3" :ratio="validity.ratio" :tone="validity.tone">
-          <span v-if="inactive" class="text-[10px] text-muted-foreground">{{ props.card.status === 'cancelled' ? '注销' : '过期' }}</span>
+          <span v-if="inactive" class="text-[10px] text-muted-foreground">{{ t(`status.short.${props.card.status === 'cancelled' ? 'cancelled' : 'expired'}`) }}</span>
           <template v-else>
             <span
               class="font-semibold tracking-tight tabular-nums"
               :class="[daysClass, dialNumber.length > 3 ? 'text-xs' : 'text-[15px]']"
             >{{ dialNumber }}</span>
-            <span class="mt-0.5 text-[10px] text-muted-foreground">天</span>
+            <span class="mt-0.5 text-[10px] text-muted-foreground">{{ t('days.unit', validity.left ?? 0) }}</span>
           </template>
         </ValidityRing>
       </DataTooltip>
