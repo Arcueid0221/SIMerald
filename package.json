@@ -1,7 +1,7 @@
 {
   "name": "simerald",
   "type": "module",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Public card-wall website for a personal SIM and eSIM collection synced from Notion, based on the Komari Emerald theme.",
   "license": "MIT",
