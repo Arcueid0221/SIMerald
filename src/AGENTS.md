@@ -4,7 +4,7 @@ This document applies to `src/` only. Keep frontend changes aligned with the exi
 
 ## Core Architecture
 
-- `main.ts` is bootstrap only. It creates the Vue app, installs Pinia and the router, loads global styles, attaches `window.$message`, calls `setupIconify()`, and mounts `App.vue`. Keep feature logic out of `main.ts`.
+- `main.ts` is bootstrap only. It creates the Vue app, installs Pinia, `vue-i18n` (`@/i18n`) and the router, loads global styles, attaches `window.$message`, calls `setupIconify()`, and mounts `App.vue`. Keep feature logic out of `main.ts`.
 - `App.vue` is the application shell. It owns global layout, mounts `<Toaster>` (`vue-sonner`) and `Provider`, runs startup lifecycle wiring (`initApp()` / `destroyInitManager()` from `@/utils/init`), and wraps `HomeView` in `<KeepAlive>`.
 - `src/router/index.ts` defines lazy-loaded routes:
   - `/` → `@/views/HomeView.vue` (card wall)
@@ -47,19 +47,27 @@ When adding or updating UI:
 - `AdminView.vue` composes the administration panels in `src/components/admin/`.
 - Keep heavy card and chart components lazily loaded with `defineAsyncComponent` (as done for `SimCard`, `SummaryCards`, and `RenewalHistory`).
 
+## Internationalization (`src/i18n/`)
+
+- `index.ts` creates the `vue-i18n` instance (Composition API, `legacy: false`) and exports `AppLocale` (`'zh-CN' | 'en'`), `setLocale()` (also sets `<html lang>`), `browserLocale()`, `translateKey()` for keys built at runtime, `translateError()` for API / sync error codes, `formatNumber()` and `compareText()` (locale-aware number formatting and sorting).
+- `locales/zh-CN.ts` is the source dictionary and defines `MessageSchema`; `locales/en.ts` is typed against it, so a missing English key fails the type check. Keys used through `t()` are not type-checked against the dictionary, so check new keys by hand.
+- Message syntax: `{name}` interpolates; plural forms are separated by `|` and selected with `t(key, n)` (`{n}` is the count); a literal `@ { } | $` must be written as `{'@'}` etc. `keepAlive`, `recordKinds` and `cycle` reuse the option names of each language's Notion template.
+- The active language lives in `useAppStore().locale`: the visitor's choice (`localStorage` key `locale`), else the `defaultLanguage` theme setting, else the browser language. The header language button toggles it. Messages are compiled by vue-i18n's JIT compiler, which works under the `script-src 'self'` CSP.
+- In components use `const { t } = useI18n()`; in plain modules (`@/utils/*`) use `i18n.global.t`. Helpers that return display text (`cardHelpers`, `cardTypeHelper`) translate at call time, so computed values re-run when the language changes.
+
 ## Stores
 
 - Pinia stores use setup store syntax and act as the single source of truth for client state.
-- `@/stores/app` owns site metadata (`publicSettings` from `/api/site`), theme-derived configuration, authentication state, layout flags, theme mode, and persisted UI preferences.
-- `@/stores/cards` owns the `SimCard[]` list from `/api/cards`, continent group derivation (via `@/utils/continentHelper`), and card lookups.
+- `@/stores/app` owns site metadata (`publicSettings` from `/api/site`), theme-derived configuration, authentication state, layout flags, theme mode, UI language (`locale`), and persisted UI preferences.
+- `@/stores/cards` owns the `SimCard[]` list from `/api/cards`, continent group derivation (continent codes from `@/utils/continentHelper`, named via `continents.<code>`), and card lookups.
 - Components and views should read from stores rather than duplicating domain state.
 - When reading `publicSettings.theme_settings`, follow the defensive pattern in `@/stores/app` (`typeof` checks, valid-option filtering, and fallback defaults). The schema lives in `shared/settings-schema.ts`.
 
 ## Utilities and Composables
 
-- `@/utils/api`: HTTP client wrapper; automatically attaches the `X-SIMerald-Request: 1` CSRF header on state-changing requests.
-- `@/utils/init`: Startup data loading and 10-minute background refresh timer; call `refreshData()` after login, logout, or manual sync.
-- `@/utils/cardHelpers`: SIM card computations (days remaining, validity ratio and color tone, initial purchase price, annual keep-alive cost, balance coverage check, and sorting).
+- `@/utils/api`: HTTP client wrapper; automatically attaches the `X-SIMerald-Request: 1` CSRF header on state-changing requests, and turns error responses into `ApiError` with `code` / `params` and a message translated from `errors.<code>`.
+- `@/utils/init`: Startup data loading and 10-minute background refresh timer; call `refreshData()` after login, logout, or manual sync. Also reloads demo cards when the UI language changes.
+- `@/utils/cardHelpers`: SIM card computations (days remaining, validity ratio and color tone, initial purchase price, annual keep-alive cost, balance coverage check, and sorting) and localized display of Notion-derived values (`countryName`, `keepAliveLabels`, `cycleText`, `recordKindLabel`, `billingPeriodText`, `joinList`).
 - `@/utils/cardTypeHelper`: Card type icon and label helpers.
 - `@/utils/financeHelper` and `@/composables/useExchangeRates`: Multi-currency conversion, monthly expense, and remaining value calculations.
 - `@/utils/regionHelper`, `@/utils/geoHelper`, `@/utils/tagHelper`: Country flag, geographic coordinate, and tag helpers.

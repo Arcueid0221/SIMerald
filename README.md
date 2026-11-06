@@ -15,10 +15,11 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
-SIMerald is a self-hosted web application that displays a personal SIM and eSIM collection synced from Notion. It is a fork of the [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald) theme, adapting its globe, summary cards, card wall, and dark mode from VPS monitoring to SIM card validity tracking, keep-alive costs, and renewal history. The web interface is in Simplified Chinese only (there is no i18n).
+SIMerald is a self-hosted web application that displays a personal SIM and eSIM collection synced from Notion. It is a fork of the [Komari Emerald](https://github.com/Tokinx/komari-theme-emerald) theme, adapting its globe, summary cards, card wall, and dark mode from VPS monitoring to SIM card validity tracking, keep-alive costs, and renewal history. The web interface is available in English and Simplified Chinese.
 
 ## Features
 
+- **English and Chinese interface**: Visitors switch languages from the header; the owner picks the default (or lets it follow the browser). Either Notion template can be shown in either language.
 - **Three card styles**: Namecard (`namecard`), Dial (`dial`), and Bar (`bar`). Visitors can switch styles in the top-right corner, and the default style is configurable in the admin panel.
 - **Validity ring**: Colored by the remaining percentage of the current cycle, comparing each card against its own renewal cycle.
 - **Interactive globe and summary metrics**: Plots cards by country on an interactive 3D globe or dotted map, alongside summary cards for active numbers, covered countries, renewals due within 30 days, next renewal, total spend, and remaining value.
@@ -57,13 +58,13 @@ The official Notion template provides a console page (with a renewal tracker and
 - **English template**: [SIMerald · SIM / eSIM Console (Template v1)](https://blossom-elk-1de.notion.site/SIMerald-SIM-eSIM-Console-Template-v1-79581cd90a0f83d29c5a81659658c201)
 - **中文模板**: [SIMerald · SIM / eSIM 总控台（模板 v1）](https://blossom-elk-1de.notion.site/SIMerald-SIM-eSIM-v1-9aa81cd90a0f83eb92dd01597a2b9cde)
 
-Connect in 5 steps (the admin UI is currently in Simplified Chinese; English UI is planned):
+Connect in 5 steps:
 
-1. **Duplicate a template**: Open either link above and click **"Duplicate"** (「复制」) at the top right into your Notion workspace.
+1. **Duplicate a template**: Open either link above and click **"Duplicate"** at the top right into your Notion workspace.
 2. **Create a read-only integration**: At [Notion Integrations](https://www.notion.so/profile/integrations), create an **"Internal"** integration with ONLY **"Read content"** enabled (no user information) and copy the `ntn_` token.
-3. **Connect the page**: On your duplicated template page, click **"•••" → "Connections"** (「连接」) at the top right and add your integration.
-4. **Auto-detect & save**: Sign in at `https://<your-domain>/admin`, paste the token in **Notion connection (「Notion 连接」)**, click **Auto-detect (「自动识别」)**, then click **Save (「保存」)**.
-5. **Verify & replace samples**: Once the 3 🧪 sample cards appear on the home page, delete the 🧪 rows in Notion, add your own cards, and click **Sync now (「立即同步」)**.
+3. **Connect the page**: On your duplicated template page, click **"•••" → "Connections"** at the top right and add your integration.
+4. **Auto-detect & save**: Sign in at `https://<your-domain>/admin`, paste the token in **Notion connection**, click **Auto-detect**, then click **Save**.
+5. **Verify & replace samples**: Once the 3 🧪 sample cards appear on the home page, delete the 🧪 rows in Notion, add your own cards, and click **Sync now**.
 
 See the full setup guide and FAQ in [docs/notion-setup.md](docs/notion-setup.md) and the template schema & formulas in [docs/notion-template/template.md](docs/notion-template/template.md).
 

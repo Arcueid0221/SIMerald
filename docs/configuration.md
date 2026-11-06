@@ -29,9 +29,9 @@ The Notion property extractors in `server/notion.ts` accept multiple Notion prop
 
 `server/mapping.ts` defines `PRESETS` with two built-in presets matching the official v1 Notion templates:
 
-- `zh` (**中文模板**): Chinese column names (`DEFAULT_MAPPING = PRESETS.zh`).
+- `zh` (**Chinese template**): Chinese column names (`DEFAULT_MAPPING = PRESETS.zh`).
 - `en` (**English template**): English column names.
-- `custom` (**自定义映射（JSON）**): Layers a custom JSON object on top of the Chinese preset (`PRESETS.zh`) via `resolveMapping` and `mergeMapping(input, base)`.
+- `custom` (**Custom mapping (JSON)**): Layers a custom JSON object on top of the Chinese preset (`PRESETS.zh`) via `resolveMapping` and `mergeMapping(input, base)`.
 
 Settings persist both `notion.preset` (`'zh' | 'en' | 'custom'`) and `notion.mapping` (the custom JSON text, which is retained while `zh` or `en` is selected so switching back to `custom` restores it). Existing installations without a saved `preset` migrate automatically to `custom` if they had a non-empty custom mapping, or `zh` otherwise, keeping existing deployments unchanged.
 
@@ -82,7 +82,7 @@ Default column names are defined in `server/mapping.ts` under `PRESETS.zh.record
 | `extendsTo` | `本次有效期延至`      | `Extends To`          | Date / Formula                     | Public     | Yes       | Date to which this transaction extends the card's validity (`YYYY-MM-DD`).                        |
 | `accounts`  | `扣款账户`            | `Payment Account`     | Relation (to Payment Accounts DB)  | Owner only | No        | Relation IDs resolved to titles from the Payment Accounts database. Stripped for public visitors. |
 
-### Status and Record Type Vocabularies (`statusValues` and `recordTypes`)
+### Option Vocabularies (`statusValues`, `recordTypes`, and `keepAliveValues`)
 
 Both built-in presets (`zh` and `en`) accept values from either template language out of the box:
 
@@ -94,10 +94,17 @@ Both built-in presets (`zh` and `en`) accept values from either template languag
   - `purchase`: `["首次购买/开卡", "Initial purchase"]`
   - `renewal`: `["续费/保号", "Renewal"]`
   - `topup`: `["额外充值", "Extra top-up"]`
+- **`keepAliveValues`** (maps keep-alive option labels to a `KeepAliveCode`, so the UI can show them in the visitor's language; labels that match no code are shown as written in Notion):
+  - `topup`: `["充值余额", "Top up balance"]`
+  - `addon`: `["购买/启用增值服务", "Buy or enable an add-on"]`
+  - `use`: `["有效使用（含收发短信）", "Regular use (incl. SMS)"]`
+  - `balanceChange`: `["产生余额变动（如发漫游短信）", "Balance change (e.g. roaming SMS)"]`
+  - `autoCharge`: `["自动扣费", "Auto-charge"]`
+  - `plan`: `["购买续费套餐", "Buy a renewal plan"]`
 
 ### Customizing Field Mapping
 
-In the `/admin` panel under the Notion connection tab, you can select `zh` (中文模板), `en` (English template), or `custom` (自定义映射（JSON）). When `custom` is selected, `mergeMapping(input, base)` layers your JSON on top of `PRESETS.zh` (`DEFAULT_MAPPING`), overriding any column names, `statusValues`, or `recordTypes` while ignoring unknown keys or invalid types:
+In the `/admin` panel under the Notion connection tab, you can select `zh` (Chinese template), `en` (English template), or `custom` (custom JSON mapping). When `custom` is selected, `mergeMapping(input, base)` layers your JSON on top of `PRESETS.zh` (`DEFAULT_MAPPING`), overriding any column names, `statusValues`, `recordTypes`, or `keepAliveValues` while ignoring unknown keys or invalid types:
 
 ```json
 {
@@ -117,6 +124,9 @@ In the `/admin` panel under the Notion connection tab, you can select `zh` (中�
     "purchase": ["Initial purchase", "首次购买/开卡"],
     "renewal": ["Renewal", "续费/保号"],
     "topup": ["Extra top-up", "额外充值"]
+  },
+  "keepAliveValues": {
+    "topup": ["Top up balance", "充值余额", "Recharge"]
   }
 }
 ```
@@ -132,7 +142,9 @@ In the `/admin` panel under the Notion connection tab, you can select `zh` (中�
   - Contains `esim` → `embedded`
   - Otherwise → `physical`
 - **Status Resolution**: If the `status` property matches a string in `statusValues.cancelled`, `statusValues.expired`, or `statusValues.active`, that status is used. Otherwise, SIMerald falls back to: `cancelled` if `cancelledAt` is set; `expired` if `expiresAt` is earlier than today (`YYYY-MM-DD`); `active` otherwise.
-- **Record Kind (`SimRecord.kind`)**: Resolved on the backend by `resolveRecordKind(type, mapping)` into `'purchase' | 'renewal' | 'topup' | 'other'` (`RecordKind`). It first checks for an exact match against `mapping.recordTypes`, then falls back to case-insensitive substring matching in either language (`首次`, `开卡`, `首购`, `purchase`, `activation`, `initial` → `purchase`; `续费`, `保号`, `renew` → `renewal`; `充值`, `top-up`, `top up`, `topup`, `recharge` → `topup`), and otherwise returns `'other'`. The frontend uses `kind` for renewal-history chart/list colors, initial purchase price on cards, and cumulative-spend breakdown (`首购` / `续费` / `其他`). Cached records written by older versions have `kind` backfilled automatically on startup (`SyncService.backfillRecordKinds`).
+- **Record Kind (`SimRecord.kind`)**: Resolved on the backend by `resolveRecordKind(type, mapping)` into `'purchase' | 'renewal' | 'topup' | 'other'` (`RecordKind`). It first checks for an exact match against `mapping.recordTypes`, then falls back to case-insensitive substring matching in either language (`首次`, `开卡`, `首购`, `purchase`, `activation`, `initial` → `purchase`; `续费`, `保号`, `renew` → `renewal`; `充值`, `top-up`, `top up`, `topup`, `recharge` → `topup`), and otherwise returns `'other'`. The frontend uses `kind` for renewal-history chart/list colors, initial purchase price on cards, cumulative-spend breakdown (initial purchase / renewal / other), and to show the record type in the visitor's language (records of kind `other` show the type as written in Notion). Cached records written by older versions have `kind` backfilled automatically on startup (`SyncService.backfillCache`).
+- **Keep-alive Codes (`SimCard.keepAliveCodes`)**: Aligned index by index with `keepAlive`. `resolveKeepAliveCode(label, mapping)` matches each label exactly (ignoring case and surrounding spaces) against `mapping.keepAliveValues` and yields a `KeepAliveCode` (`topup`, `addon`, `use`, `balanceChange`, `autoCharge`, `plan`) or `null`. Caches written before v0.3 get the codes backfilled on startup (`SyncService.backfillCache`).
+- **Localized Display**: Country names are derived in the browser from the flag emoji (`region`) with `Intl.DisplayNames`, using the short forms `中国香港` / `中国澳门` / `中国台湾` and `Hong Kong` / `Macao` / `Taiwan`; the Notion text (`countryName`) is the fallback for unknown flags. The renewal cycle is shown from `cycleDays` (e.g. "每 365 天" / "Every 365 days"; `0` reads as "varies"), and status from `status`.
 - **Next Renewal Date**: Resolved in order: `nextRenewal.start` → `nextRenewalOverride.start` → `expiresAt`. For `cancelled` cards, `nextRenewalAt` and `nextRenewalEnd` are forced to `null`.
 - **Period Start (`periodStart`)**: Expense records for a card are sorted by `date` descending (ties broken by `extendsTo` descending). `periodStart` is the `date` of the most recent record that has both `date` and `extendsTo`.
 - **Remaining Days and Validity Ring**: Calculated in the browser relative to the visitor's current date so countdowns stay accurate between daily syncs.
@@ -145,7 +157,7 @@ Filtering happens on the backend in `server/view.ts` (`toPublicCard` and `public
 | Data                                                                                                                                                               | Public Visitor | Signed-In Owner |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | --------------- |
 | `id`, `name`, `carrier`, `last4`, `numberMasked`, `region`, `countryName`, `logo`, `order`                                                                         | Yes            | Yes             |
-| `typeKind`, `typeColor`, `keepAlive`, `cycleDays`, `cycleLabel`, `price`, `currency`                                                                               | Yes            | Yes             |
+| `typeKind`, `typeColor`, `keepAlive`, `keepAliveCodes`, `cycleDays`, `cycleLabel`, `price`, `currency`                                                             | Yes            | Yes             |
 | `expiresAt`, `nextRenewalAt`, `nextRenewalEnd`, `periodStart`, `status`, `statusLabel`, `cancelledAt`, `firstPurchaseAt`, `totalSpentCNY`, `urgency`               | Yes            | Yes             |
 | Expense record `id`, `type`, `kind`, `date`, `amount`, `currency`, `rate`, `amountCNY`, `extendsTo`                                                                | Yes            | Yes             |
 | Full phone number (`number`)                                                                                                                                       | No             | Yes             |
@@ -160,11 +172,12 @@ Signing in at `/admin` opens the administration interface, which is organized in
 
 ### 1. Theme and Site Settings (`shared/settings-schema.ts`)
 
-Validated on the backend and rendered dynamically in the admin form:
+Validated on the backend and rendered dynamically in the admin form. Labels are not part of the schema: titles carry a `section` id and the form looks up `settings.sections.<section>` and `settings.fields.<key>.{name,help,options.<value>}` in the locale dictionaries (`src/i18n/locales/`).
 
 | Category          | Key                           | Type       | Default                        | Options / Constraints                          | Description                                                                  |
 | ----------------- | ----------------------------- | ---------- | ------------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------- |
 | Basic             | `sitename`                    | `string`   | `'SIMerald'`                   | Max 500 chars                                  | Site title shown in the header and browser tab.                              |
+| Basic             | `defaultLanguage`             | `select`   | `'auto'`                       | `auto`, `zh-CN`, `en`                          | UI language for new visitors; `auto` follows the browser language.           |
 | Basic             | `defaultCardStyle`            | `select`   | `'namecard'`                   | `namecard`, `dial`, `bar`                      | Default card layout for new visitors (visitors can override in browser).     |
 | Basic             | `defaultSort`                 | `select`   | `'renewal'`                    | `renewal`, `notion`, `name`, `country`         | Default card wall sort order.                                                |
 | Announcement      | `alertEnabled`                | `switch`   | `false`                        | Boolean                                        | Display a custom announcement banner on the home page.                       |
@@ -174,7 +187,7 @@ Validated on the backend and rendered dynamically in the admin form:
 | Page              | `visitorInfoCardEnabled`      | `switch`   | `true`                         | Boolean                                        | Show the visitor IP / device / browser card in the header.                   |
 | Page              | `hideAdminEntryWhenLoggedOut` | `switch`   | `false`                        | Boolean                                        | Hide the top-bar admin button when not signed in.                            |
 | Page              | `disablePageAnimation`        | `switch`   | `false`                        | Boolean                                        | Reduce page transition animations.                                           |
-| Page              | `cancelledLast`               | `switch`   | `true`                         | Boolean                                        | Push cancelled numbers (`已注销`) to the end of the list.                    |
+| Page              | `cancelledLast`               | `switch`   | `true`                         | Boolean                                        | Push cancelled numbers (status `cancelled`) to the end of the list.          |
 | ICP / Filing      | `icpEnabled`                  | `switch`   | `false`                        | Boolean                                        | Show ICP filing link in the footer.                                          |
 | ICP / Filing      | `icpNumber`                   | `string`   | `''`                           | Max 500 chars                                  | ICP filing number text.                                                      |
 | ICP / Filing      | `icpUrl`                      | `string`   | `'https://beian.miit.gov.cn/'` | Max 500 chars                                  | URL opened when clicking the ICP filing number.                              |
@@ -190,7 +203,7 @@ Validated on the backend and rendered dynamically in the admin form:
 
 ### 2. Data Sync Panel
 
-- Displays current sync state (`running`, `lastStartedAt`, `lastFinishedAt`, `lastSuccessAt`, `lastReason`, `cardCount`, `recordCount`, `nextRunAt`, `lastError`, `lastWarning`, `fieldIssues`).
+- Displays current sync state (`running`, `lastStartedAt`, `lastFinishedAt`, `lastSuccessAt`, `lastReason`, `cardCount`, `recordCount`, `nextRunAt`, `lastError`, `lastWarning`, `fieldIssues`). `lastReason` is a `SyncReason` (`startup`, `daily`, `settings`, `manual`). `lastError` / `lastWarning` hold an English message and come with `lastErrorCode` / `lastErrorParams` and `lastWarningCode` / `lastWarningParams`, which the panel translates (see [Interface Language](#interface-language)); messages stored by v0.2 have no code and are shown as written.
 - Lists any schema mismatches found by `checkFields` (`server/fieldcheck.ts`) during the latest sync (`fieldIssues: FieldIssue[]`), marking public-wall fields with `●` (`important: true`) and owner-only fields with `○` (`important: false`). Field issues do not fail the sync.
 - Provides a manual sync button for immediate synchronization.
 - Configures the daily sync time (`HH:mm`, default `05:00`) and IANA timezone (default `Asia/Shanghai`).
@@ -207,7 +220,7 @@ Validated on the backend and rendered dynamically in the admin form:
 ## Sync Schedule, Field Health Check, and Caching
 
 - **Daily Schedule**: `SyncService` calculates the next occurrence of the configured `HH:mm` in the configured timezone using `Intl.DateTimeFormat` and schedules a timer.
-- **Stale Startup Sync & Backfill**: On server startup, cached records missing `kind` are backfilled via `SyncService.backfillRecordKinds`. If Notion is configured and the cached data is missing or older than 25 hours (`STALE_AFTER_MS`), a background sync triggers automatically after 3 seconds.
+- **Stale Startup Sync & Backfill**: On server startup, caches from older versions get record `kind` and card `keepAliveCodes` backfilled via `SyncService.backfillCache`. If Notion is configured and the cached data is missing or older than 25 hours (`STALE_AFTER_MS`), a background sync triggers automatically after 3 seconds.
 - **Field Health Check (`server/fieldcheck.ts`)**: Each sync resets `SyncStatus.fieldIssues` to `null` at the start, then runs `checkFields(db, schema, mapping)` against the resolved `cards` and `records` data source schemas. It reports missing columns (`problem: 'missing'`) or incompatible property types (`problem: 'type'`, with `actualType` and `expectedTypes`). Title mappings (`cards.name`, `records.title`) are not flagged if the database has any `title` column (title fallback). Acceptable property types per extractor are:
   - Text fields: `title`, `rich_text`, `select`, `status`, `phone_number`, `email`, `url`, `number`, `multi_select`, `formula`, `rollup`
   - Number fields: `number`, `formula`, `rollup`
@@ -216,7 +229,16 @@ Validated on the backend and rendered dynamically in the admin form:
   - Relation fields: `relation`
 - **Local Cache**: Synced cards are stored in `<DATA_DIR>/cache.json` and sync metadata in `<DATA_DIR>/sync-status.json`. Visitor page loads read exclusively from memory/disk cache and never trigger requests to Notion.
 - **Rate Limiting & Retries**: `NotionClient` spaces requests by at least `350 ms` (`MIN_INTERVAL_MS`), enforces a `20 s` timeout per request, and retries HTTP `429`, `5xx`, and network errors up to 4 times (honoring `Retry-After` headers or exponential backoff).
-- **Failure Handling**: If a sync fails, the previous `cache.json` is kept intact and `lastError` is recorded in `sync-status.json`.
+- **Failure Handling**: If a sync fails, the previous `cache.json` is kept intact and `lastError` (with `lastErrorCode` / `lastErrorParams`) is recorded in `sync-status.json`.
+
+## Interface Language
+
+The web UI (visitor pages, admin panel, setup and login) is available in Simplified Chinese (`zh-CN`) and English (`en`), using `vue-i18n` with dictionaries in `src/i18n/locales/` (`zh-CN.ts` is the source; `en.ts` must provide every key).
+
+- **Which language a visitor sees**: the visitor's own choice from the header language toggle (stored in `localStorage` as `locale`), otherwise the owner's `defaultLanguage` theme setting, otherwise the browser language (any `zh*` → Chinese, everything else → English). `<html lang>` follows the active language.
+- **Notion data**: Values the app understands are shown in the UI language regardless of which template they came from: status, card category, keep-alive actions with a code, renewal cycle, record kinds, and country names (see [Localized Display](#derived-values-and-calculation-rules)). Free text from Notion is shown as written: card names, devices, services, accounts, record titles, records of kind `other`, keep-alive options outside `keepAliveValues`, and the announcement.
+- **API errors**: Failed requests return `{ "error": "<English message>", "code": "<code>", "params": { ... }, "retryAfter": <seconds> }` (`ApiErrorBody` in `shared/types.ts`; `retryAfter` only on `429`). The UI translates `errors.<code>` with `params` and falls back to `error`. Codes are grouped by prefix: `http.*` (request handling), `auth.*` (setup, login, sessions), `notion.*` (Notion API and token), `settings.*` (validation), and `sync.*` (sync preconditions and warnings). A `cause` param holding another code (e.g. in `sync.accountsSkipped`) is translated first.
+- **Demo data**: `GET /api/cards?lang=zh|en` returns the demo cards as the Chinese or English template would contain them; the UI passes its current language and reloads the demo cards when the language changes. Synced Notion data ignores `lang`.
 
 ## Environment Variables
 
@@ -265,5 +287,6 @@ Back up the entire `data/` directory to preserve your credentials, settings, log
 When no Notion token is configured (neither in the admin panel nor via `NOTION_TOKEN`), `SyncService.isDemo()` returns `true`:
 
 - `/api/cards` serves built-in fictional SIM cards generated by `server/demo.ts`.
-- The demo-mode banner on the home page links to the Notion setup tutorial (`src/utils/links.ts` `NOTION_SETUP_URL`, pointing to `docs/notion-setup.zh-CN.md` on GitHub).
+- `/api/cards?lang=en` returns them as the English template would contain them (default `zh`).
+- The demo-mode banner on the home page links to the Notion setup tutorial in the current UI language (`notionSetupUrl()` in `src/utils/links.ts`, pointing to `docs/notion-setup.md` or `docs/notion-setup.zh-CN.md` on GitHub).
 - Scheduled startup syncs are skipped until a Notion token and database IDs are saved.

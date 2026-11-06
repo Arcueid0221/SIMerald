@@ -85,7 +85,7 @@ SIMerald 使用 Notion 作为数据源。官方提供的 Notion 模板包含一�
 { "cards": { "name": "Name", "number": "Phone" }, "records": { "card": "Card" } }
 ```
 
-你也可以覆盖选项值列表，如 `statusValues`（使用中 / 已过期 / 已注销 对应的文本）和 `recordTypes`（首次购买 / 续费 / 额外充值 对应的文本）。完整键名列表见 [docs/configuration.md](configuration.md)。注意：模板中的公式也会按名称引用列，若在 Notion 中重命名了列，需要同步修改公式中的列名。
+你也可以覆盖选项值列表，如 `statusValues`（使用中 / 已过期 / 已注销 对应的文本）、`recordTypes`（首次购买 / 续费 / 额外充值 对应的文本）和 `keepAliveValues`（保号动作选项对应的文本，用于按访客的界面语言显示）。完整键名列表见 [docs/configuration.md](configuration.md)。注意：模板中的公式也会按名称引用列，若在 Notion 中重命名了列，需要同步修改公式中的列名。
 
 ### 「⚠️ 数据检查」列是什么？
 
