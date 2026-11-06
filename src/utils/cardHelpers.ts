@@ -122,7 +122,7 @@ export function getValidityTooltip(card: SimCard, validity: ValidityInfo): strin
 }
 
 export function isPurchaseRecord(record: SimRecord): boolean {
-  return record.type.includes('首次') || record.type.includes('开卡')
+  return record.kind === 'purchase'
 }
 
 export interface PurchaseInfo {

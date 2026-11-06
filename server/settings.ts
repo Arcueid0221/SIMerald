@@ -1,10 +1,10 @@
 import type { SettingValue } from '../shared/settings-schema.ts'
 import type { AppConfig } from './config.ts'
-import type { FieldMapping } from './mapping.ts'
+import type { FieldMapping, PresetChoice } from './mapping.ts'
 import type { JsonStore } from './storage.ts'
 import { randomBytes } from 'node:crypto'
 import { getDefaultSettings, sanitizeSettings } from '../shared/settings-schema.ts'
-import { DEFAULT_MAPPING, parseMappingText } from './mapping.ts'
+import { DEFAULT_MAPPING, isPresetChoice, parseMappingText, resolveMapping } from './mapping.ts'
 import { normalizeNotionId } from './notion.ts'
 
 const SETTINGS_FILE = 'settings.json'
@@ -19,6 +19,9 @@ interface StoredSettings {
     cardsDb: string
     recordsDb: string
     accountsDb: string
+    /** Column preset; `custom` uses `mapping` */
+    preset: PresetChoice
+    /** Custom mapping JSON layered on the Chinese preset */
     mapping: string
   }
 }
@@ -35,6 +38,7 @@ export interface NotionConnection {
   cardsDb: string | null
   recordsDb: string | null
   accountsDb: string | null
+  preset: PresetChoice
   mapping: FieldMapping
 }
 
@@ -65,6 +69,8 @@ export class SettingsService {
         cardsDb: raw.notion?.cardsDb ?? '',
         recordsDb: raw.notion?.recordsDb ?? '',
         accountsDb: raw.notion?.accountsDb ?? '',
+        // Installations from before presets existed: a saved custom mapping keeps working as `custom`
+        preset: isPresetChoice(raw.notion?.preset) ? raw.notion.preset : raw.notion?.mapping ? 'custom' : 'zh',
         mapping: raw.notion?.mapping ?? '',
       },
     }
@@ -121,7 +127,7 @@ export class SettingsService {
     const pick = (saved: string, fallback: string | null) => normalizeNotionId(saved) ?? (fallback ? normalizeNotionId(fallback) : null)
     let mapping = DEFAULT_MAPPING
     try {
-      mapping = parseMappingText(this.data.notion.mapping)
+      mapping = resolveMapping(this.data.notion.preset, this.data.notion.mapping)
     }
     catch {
       // Validated on save; fallback only
@@ -132,21 +138,23 @@ export class SettingsService {
       cardsDb: pick(this.data.notion.cardsDb, this.config.envCardsDb),
       recordsDb: pick(this.data.notion.recordsDb, this.config.envRecordsDb),
       accountsDb: pick(this.data.notion.accountsDb, this.config.envAccountsDb),
+      preset: this.data.notion.preset,
       mapping,
     }
   }
 
-  get notionForm(): { cardsDb: string, recordsDb: string, accountsDb: string, mapping: string } {
+  get notionForm(): { cardsDb: string, recordsDb: string, accountsDb: string, preset: PresetChoice, mapping: string } {
     const effective = this.notion
     return {
       cardsDb: effective.cardsDb ?? '',
       recordsDb: effective.recordsDb ?? '',
       accountsDb: effective.accountsDb ?? '',
+      preset: this.data.notion.preset,
       mapping: this.data.notion.mapping || JSON.stringify(DEFAULT_MAPPING, null, 2),
     }
   }
 
-  updateNotion(input: { token?: unknown, clearToken?: unknown, cardsDb?: unknown, recordsDb?: unknown, accountsDb?: unknown, mapping?: unknown }): void {
+  updateNotion(input: { token?: unknown, clearToken?: unknown, cardsDb?: unknown, recordsDb?: unknown, accountsDb?: unknown, preset?: unknown, mapping?: unknown }): void {
     const ids: Record<'cardsDb' | 'recordsDb' | 'accountsDb', string> = { cardsDb: '', recordsDb: '', accountsDb: '' }
     for (const key of ['cardsDb', 'recordsDb', 'accountsDb'] as const) {
       const value = input[key]
@@ -158,24 +166,29 @@ export class SettingsService {
       ids[key] = id
     }
 
-    let mappingText = ''
-    if (typeof input.mapping === 'string' && input.mapping.trim()) {
-      try {
-        parseMappingText(input.mapping)
+    const preset: PresetChoice = isPresetChoice(input.preset) ? input.preset : this.data.notion.preset
+    // The custom mapping is kept while a preset is selected, so switching back restores it
+    let mappingText = this.data.notion.mapping
+    if (preset === 'custom' && typeof input.mapping === 'string') {
+      mappingText = ''
+      if (input.mapping.trim()) {
+        try {
+          parseMappingText(input.mapping)
+        }
+        catch {
+          throw new Error('字段映射不是合法的 JSON')
+        }
+        // Omit when identical to the default so future default updates take effect automatically
+        const normalized = JSON.stringify(JSON.parse(input.mapping))
+        mappingText = normalized === JSON.stringify(DEFAULT_MAPPING) ? '' : input.mapping
       }
-      catch {
-        throw new Error('字段映射不是合法的 JSON')
-      }
-      // Omit when identical to the default so future default updates take effect automatically
-      const normalized = JSON.stringify(JSON.parse(input.mapping))
-      mappingText = normalized === JSON.stringify(DEFAULT_MAPPING) ? '' : input.mapping
     }
 
     const newToken = typeof input.token === 'string' ? input.token.trim() : ''
     if (newToken && (newToken.length < 20 || newToken.length > 200))
       throw new Error('Notion token 格式不对')
 
-    this.data.notion = { ...ids, mapping: mappingText }
+    this.data.notion = { ...ids, preset, mapping: mappingText }
     this.save()
 
     if (input.clearToken === true) {

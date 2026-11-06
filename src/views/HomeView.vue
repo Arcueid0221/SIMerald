@@ -15,6 +15,7 @@ import { CARD_STYLES, useAppStore } from '@/stores/app'
 import { useCardsStore } from '@/stores/cards'
 import { sortCards } from '@/utils/cardHelpers'
 import { getContinent } from '@/utils/continentHelper'
+import { NOTION_SETUP_URL } from '@/utils/links'
 import { isRegionMatch } from '@/utils/regionHelper'
 
 defineOptions({ name: 'HomeView' })
@@ -145,6 +146,9 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
           站长还没有连接 Notion，下面的号码和运营商都是虚构的。<RouterLink v-if="appStore.isLoggedIn" to="/admin" class="text-emerald-600 underline-offset-4 hover:underline">
             去后台连接 Notion
           </RouterLink>
+          <a :href="NOTION_SETUP_URL" target="_blank" rel="noopener noreferrer" class="text-emerald-600 underline-offset-4 hover:underline" :class="appStore.isLoggedIn && 'ml-2'">
+            查看接入教程
+          </a>
         </AlertDescription>
       </Alert>
     </div>

@@ -9,6 +9,7 @@ function publicRecord(record: SimRecord): SimRecord {
   return {
     id: record.id,
     type: record.type,
+    kind: record.kind,
     date: record.date,
     amount: record.amount,
     currency: record.currency,

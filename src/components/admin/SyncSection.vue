@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AdminStatus } from '@shared/types'
+import type { AdminStatus, FieldIssue } from '@shared/types'
 import { Icon } from '@iconify/vue'
 import { computed, ref, watch } from 'vue'
 import AdminSection from '@/components/admin/AdminSection.vue'
@@ -35,6 +35,16 @@ const state = computed(() => {
     return { text: '同步正常', class: 'text-emerald-600', icon: 'tabler:circle-check' }
   return { text: '还没有同步过', class: 'text-muted-foreground', icon: 'tabler:clock' }
 })
+
+const DB_LABELS: Record<FieldIssue['db'], string> = { cards: 'SIM 卡库', records: '消费记录库' }
+
+const fieldIssues = computed(() => props.status.notion.tokenConfigured ? props.status.sync.fieldIssues ?? [] : [])
+
+function describeIssue(issue: FieldIssue): string {
+  if (issue.problem === 'missing')
+    return '：找不到这一列'
+  return `：类型是 ${issue.actualType}，应为 ${issue.expectedTypes.join(' / ')}`
+}
 
 function fmt(value: string | null): string {
   return value ? formatDateTime(value, 'YYYY-MM-DD HH:mm:ss') : '-'
@@ -112,6 +122,22 @@ async function saveSchedule() {
       </div>
       <div v-if="props.status.sync.lastError" class="rounded-md bg-red-400/10 p-3 text-xs text-destructive leading-relaxed">
         {{ fmt(props.status.sync.lastFinishedAt) }}：{{ props.status.sync.lastError }}
+      </div>
+      <div v-if="fieldIssues.length" class="rounded-md bg-yellow-400/10 p-3 text-xs leading-relaxed text-yellow-700 dark:text-yellow-300 flex flex-col gap-1.5">
+        <p class="font-medium">
+          有 {{ fieldIssues.length }} 个字段对不上，对应的信息不会显示。改 Notion 列名，或在「Notion 连接」里换字段预设 / 自定义映射：
+        </p>
+        <ul class="flex flex-col gap-1">
+          <li v-for="issue in fieldIssues" :key="`${issue.db}.${issue.key}`" class="flex flex-wrap gap-x-1.5">
+            <span :class="issue.important ? 'text-destructive' : ''">{{ issue.important ? '●' : '○' }}</span>
+            <span>{{ DB_LABELS[issue.db] }}</span>
+            <code class="font-mono">{{ issue.column || issue.key }}</code>
+            <span>{{ describeIssue(issue) }}</span>
+          </li>
+        </ul>
+        <p class="text-muted-foreground">
+          ● 影响首页显示 ○ 只影响站长可见的信息
+        </p>
       </div>
       <form class="flex flex-wrap items-end gap-3" @submit.prevent="saveSchedule">
         <FormField label="每天同步时间" for-id="sync-time">

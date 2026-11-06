@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SimCard, SimRecord } from '@shared/types'
+import type { RecordKind, SimCard, SimRecord } from '@shared/types'
 import { computed } from 'vue'
 import VChart from 'vue-echarts'
 import { CardX } from '@/components/ui/card-x'
@@ -32,21 +32,11 @@ const chartThemeColors = computed(() => ({
   tooltipShadow: isDark.value ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.06)',
 }))
 
-const TYPE_COLORS: Record<string, string> = {
+const TYPE_COLORS: Record<RecordKind, string> = {
   purchase: '#A78BFA',
   renewal: '#4ECDC4',
   topup: '#60A5FA',
   other: '#FFB347',
-}
-
-function typeKey(type: string): keyof typeof TYPE_COLORS {
-  if (type.includes('首次') || type.includes('开卡'))
-    return 'purchase'
-  if (type.includes('续费') || type.includes('保号'))
-    return 'renewal'
-  if (type.includes('充值'))
-    return 'topup'
-  return 'other'
 }
 
 const records = computed<SimRecord[]>(() => [...props.card.history].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')))
@@ -78,7 +68,7 @@ const chartOption = computed(() => ({
       const record = chartRecords.value[list[0]?.dataIndex ?? -1]
       if (!record)
         return ''
-      const color = TYPE_COLORS[typeKey(record.type)]
+      const color = TYPE_COLORS[record.kind]
       return [
         `<div style="font-weight:600">${record.date}</div>`,
         `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color}"></span>${record.type || '消费'}</div>`,
@@ -106,7 +96,7 @@ const chartOption = computed(() => ({
     barMaxWidth: 28,
     data: chartRecords.value.map(r => ({
       value: Math.round((r.amountCNY ?? 0) * 100) / 100,
-      itemStyle: { color: TYPE_COLORS[typeKey(r.type)], borderRadius: [3, 3, 0, 0] },
+      itemStyle: { color: TYPE_COLORS[r.kind], borderRadius: [3, 3, 0, 0] },
     })),
   }],
 }))
@@ -173,7 +163,7 @@ const chartOption = computed(() => ({
               </td>
               <td class="py-1.5 pr-3 whitespace-nowrap">
                 <span class="inline-flex items-center gap-1.5">
-                  <span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS[typeKey(record.type)] }" />
+                  <span class="inline-block size-2 rounded-[2px]" :style="{ background: TYPE_COLORS[record.kind] }" />
                   {{ record.type || '-' }}
                 </span>
               </td>

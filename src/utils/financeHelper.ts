@@ -1,6 +1,7 @@
 import type { SimCard } from '@shared/types'
 
 const FINANCE_CURRENCY_CONFIG = {
+  AED: { rate: 0.5435, symbol: 'Dh' },
   AUD: { rate: 0.20941, symbol: 'A$' },
   BRL: { rate: 0.74734, symbol: 'R$' },
   CAD: { rate: 0.20691, symbol: 'C$' },
@@ -20,6 +21,7 @@ const FINANCE_CURRENCY_CONFIG = {
   KRW: { rate: 224.11, symbol: '₩' },
   KZT: { rate: 64, symbol: '₸' },
   LKR: { rate: 41.2, symbol: 'Rs' },
+  MOP: { rate: 1.194, symbol: 'MOP$' },
   MXN: { rate: 2.5472, symbol: 'Mex$' },
   MYR: { rate: 0.59945, symbol: 'RM' },
   NOK: { rate: 1.4096, symbol: 'kr' },
@@ -32,6 +34,7 @@ const FINANCE_CURRENCY_CONFIG = {
   SGD: { rate: 0.18975, symbol: 'S$' },
   THB: { rate: 4.8172, symbol: '฿' },
   TRY: { rate: 6.849, symbol: '₺' },
+  TWD: { rate: 4.51, symbol: 'NT$' },
   UAH: { rate: 3.6, symbol: '₴' },
   USD: { rate: 0.14799, symbol: '$' },
   VND: { rate: 3500, symbol: '₫' },

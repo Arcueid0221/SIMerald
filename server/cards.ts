@@ -2,6 +2,7 @@ import type { CardKind, CardStatus, NotionColor, SimCard, SimRecord } from '../s
 import type { FieldMapping } from './mapping.ts'
 import type { NotionPage } from './notion.ts'
 import { createHmac } from 'node:crypto'
+import { resolveRecordKind } from './mapping.ts'
 import { findTitleProperty, propDate, propList, propNumber, propRelation, propSelect, propText } from './notion.ts'
 
 /**
@@ -102,11 +103,13 @@ export function buildRecord(page: NotionPage, mapping: FieldMapping, accountName
   const p = page.properties
   const f = mapping.records
   const titleProp = p[f.title] ?? findTitleProperty(page)
+  const type = propText(p[f.type]) ?? ''
   return {
     id: opaqueId(page.id, idKey),
     cardId: propRelation(p[f.card])[0] ?? null,
     title: propText(titleProp) ?? '',
-    type: propText(p[f.type]) ?? '',
+    type,
+    kind: resolveRecordKind(type, mapping),
     date: toDate(propDate(p[f.date])?.start),
     amount: propNumber(p[f.amount]),
     currency: parseCurrency(propText(p[f.currency])),

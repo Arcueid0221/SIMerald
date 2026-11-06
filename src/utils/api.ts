@@ -2,7 +2,7 @@
  * SIMerald backend API client.
  * State-changing requests send `X-SIMerald-Request` for CSRF protection.
  */
-import type { AdminStatus, CardsResponse, SiteInfo, ThemeSettings } from '@shared/types'
+import type { AdminStatus, CardsResponse, DetectMatch, MappingPresetChoice, SiteInfo, ThemeSettings } from '@shared/types'
 
 export class ApiError extends Error {
   status: number
@@ -68,8 +68,10 @@ export const api = {
     request<{ theme_settings: ThemeSettings }>('PUT', '/api/admin/theme', { theme }),
   saveSchedule: (syncTime: string, timezone: string) =>
     request<AdminStatus>('PUT', '/api/admin/schedule', { syncTime, timezone }),
-  saveNotion: (payload: { token?: string, clearToken?: boolean, cardsDb: string, recordsDb: string, accountsDb: string, mapping: string }) =>
+  saveNotion: (payload: { token?: string, clearToken?: boolean, cardsDb: string, recordsDb: string, accountsDb: string, preset: MappingPresetChoice, mapping: string }) =>
     request<AdminStatus>('PUT', '/api/admin/notion', payload),
+  detectNotion: (token?: string) =>
+    request<{ matches: DetectMatch[] }>('POST', '/api/admin/notion/detect', { token }),
   syncNow: () => request<AdminStatus>('POST', '/api/admin/sync'),
   changePassword: (currentPassword: string, code: string, newPassword: string) =>
     request<{ ok: true }>('POST', '/api/admin/password', { currentPassword, code, newPassword }),

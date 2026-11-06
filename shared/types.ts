@@ -8,6 +8,9 @@ export type CardStatus = 'active' | 'expired' | 'cancelled'
 /** High-level card category, determines the icon */
 export type CardKind = 'physical' | 'adapter' | 'embedded' | 'virtual'
 
+/** Internal category of an expense record, resolved by the backend from the record type label */
+export type RecordKind = 'purchase' | 'renewal' | 'topup' | 'other'
+
 /** Notion select option colors */
 export type NotionColor
   = | 'default' | 'gray' | 'brown' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'red'
@@ -15,8 +18,9 @@ export type NotionColor
 export interface SimRecord {
   /** Opaque ID derived from the Notion page ID (irreversible) */
   id: string
-  /** Transaction category (initial purchase, renewal, top-up, or other fee) */
+  /** Transaction category label as written in Notion */
   type: string
+  kind: RecordKind
   /** Transaction date (YYYY-MM-DD) */
   date: string | null
   /** Payment amount in original currency */
@@ -130,6 +134,43 @@ export interface SyncStatus {
   cardCount: number
   recordCount: number
   nextRunAt: string | null
+  /** Mapped columns that are missing or have an unexpected type, from the last sync; null when not checked */
+  fieldIssues: FieldIssue[] | null
+}
+
+export type NotionDbKey = 'cards' | 'records'
+
+/** A mapped column that could not be read as expected */
+export interface FieldIssue {
+  db: NotionDbKey
+  /** Mapping key, e.g. `expiresAt` */
+  key: string
+  /** Column name SIMerald looked for */
+  column: string
+  problem: 'missing' | 'type'
+  /** Actual Notion property type when `problem` is `type` */
+  actualType?: string
+  /** Notion property types SIMerald can read for this field */
+  expectedTypes: string[]
+  /** True when the field drives the public card wall (validity, status, prices…) */
+  important: boolean
+}
+
+export type MappingPresetChoice = 'zh' | 'en' | 'custom'
+
+export interface DetectedDatabase {
+  id: string
+  title: string
+}
+
+/** One complete template found by auto-detection */
+export interface DetectMatch {
+  preset: 'zh' | 'en'
+  cards: DetectedDatabase
+  records: DetectedDatabase | null
+  accounts: DetectedDatabase | null
+  /** Number of preset columns found in the cards database */
+  matchedColumns: number
 }
 
 export interface NotionSettingsView {
@@ -139,6 +180,8 @@ export interface NotionSettingsView {
   cardsDb: string
   recordsDb: string
   accountsDb: string
+  preset: MappingPresetChoice
+  /** Custom mapping JSON, used when `preset` is `custom` */
   mapping: string
 }
 

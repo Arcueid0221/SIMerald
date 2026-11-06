@@ -5,7 +5,9 @@ import { createServer } from 'node:http'
 import path from 'node:path'
 import { AuthError, AuthService } from './auth.ts'
 import { loadConfig } from './config.ts'
+import { detectTemplates } from './detect.ts'
 import { LogoStore } from './logos.ts'
+import { NotionClient, NotionError } from './notion.ts'
 import { SettingsService } from './settings.ts'
 import { JsonStore } from './storage.ts'
 import { SyncService } from './sync.ts'
@@ -289,6 +291,26 @@ const routes: Record<string, Handler> = {
     if (settings.notion.token)
       await runSyncForResponse('Notion 设置已修改')
     sendJson(res, 200, adminStatus())
+  },
+
+  'POST /api/admin/notion/detect': async (req, res) => {
+    requireLogin(req)
+    const body = await readJsonBody(req)
+    // A token typed into the form but not saved yet can be used for detection
+    const typed = typeof body.token === 'string' ? body.token.trim() : ''
+    const token = typed || settings.notion.token
+    if (!token)
+      throw new HttpError(400, '请先填写 Notion token')
+    if (typed && (typed.length < 20 || typed.length > 200))
+      throw new HttpError(400, 'Notion token 格式不对')
+    try {
+      sendJson(res, 200, { matches: await detectTemplates(new NotionClient(token)) })
+    }
+    catch (error) {
+      if (error instanceof NotionError)
+        throw new HttpError(400, error.message)
+      throw error
+    }
   },
 
   'POST /api/admin/sync': async (req, res) => {

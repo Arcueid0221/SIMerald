@@ -64,9 +64,9 @@ const spendBreakdown = computed(() => {
     total += card.totalSpentCNY ?? 0
     for (const record of card.history) {
       const amount = record.amountCNY ?? 0
-      if (record.type.includes('首次') || record.type.includes('开卡'))
+      if (record.kind === 'purchase')
         purchase += amount
-      else if (record.type.includes('续费') || record.type.includes('保号'))
+      else if (record.kind === 'renewal')
         renewal += amount
       else
         other += amount

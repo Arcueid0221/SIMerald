@@ -73,6 +73,28 @@ export interface NotionPage {
   properties: Record<string, NotionPropertyValue>
 }
 
+/** Property schema entry of a data source, declaring only the fields we use. */
+export interface NotionPropertySchema {
+  id: string
+  name: string
+  type: string
+  relation?: { data_source_id?: string, database_id?: string }
+}
+
+export interface NotionDataSource {
+  object: string
+  id: string
+  title?: Array<{ plain_text: string }>
+  in_trash?: boolean
+  archived?: boolean
+  parent?: { type: string, database_id?: string }
+  properties?: Record<string, NotionPropertySchema>
+}
+
+export function dataSourceTitle(source: NotionDataSource): string {
+  return (source.title ?? []).map(t => t.plain_text).join('').trim()
+}
+
 /** Normalizes a Notion URL or dashed/undashed ID into a dashed UUID. */
 export function normalizeNotionId(input: string): string | null {
   const match = input.replace(DASHES_REGEX, '').match(HEX32_REGEX)
@@ -154,11 +176,10 @@ export class NotionClient {
     }
   }
 
-  /** Accepts a data source ID or database ID and returns the data source ID. */
-  async resolveDataSource(id: string): Promise<string> {
+  /** Accepts a data source ID or database ID and returns the data source, including its property schema. */
+  async resolveDataSource(id: string): Promise<NotionDataSource> {
     try {
-      const ds = await this.request<{ id: string }>('GET', `/data_sources/${id}`)
-      return ds.id
+      return await this.getDataSource(id)
     }
     catch (error) {
       if (!(error instanceof NotionError) || (error.status !== 404 && error.status !== 400))
@@ -168,7 +189,34 @@ export class NotionClient {
     const first = db.data_sources?.[0]?.id
     if (!first)
       throw new NotionError(404, 'object_not_found', '这个数据库里没有数据源')
-    return first
+    return await this.getDataSource(first)
+  }
+
+  /** Fetches a data source with its property schema. */
+  async getDataSource(dataSourceId: string): Promise<NotionDataSource> {
+    return await this.request<NotionDataSource>('GET', `/data_sources/${dataSourceId}`)
+  }
+
+  /** Lists every data source shared with the integration (capped at `maxPages` × 100 results). */
+  async searchDataSources(maxPages = 5): Promise<NotionDataSource[]> {
+    const sources: NotionDataSource[] = []
+    let cursor: string | undefined
+    let pages = 0
+    do {
+      const result = await this.request<{ results: NotionDataSource[], has_more: boolean, next_cursor: string | null }>(
+        'POST',
+        '/search',
+        {
+          filter: { property: 'object', value: 'data_source' },
+          page_size: 100,
+          start_cursor: cursor,
+        },
+      )
+      sources.push(...result.results.filter(s => s.object === 'data_source' && !s.in_trash && !s.archived))
+      cursor = result.has_more ? (result.next_cursor ?? undefined) : undefined
+      pages++
+    } while (cursor && pages < maxPages)
+    return sources
   }
 
   async queryAll(dataSourceId: string): Promise<NotionPage[]> {

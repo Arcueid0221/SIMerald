@@ -1,9 +1,11 @@
-import type { SimCard, SyncStatus } from '../shared/types.ts'
+import type { FieldIssue, SimCard, SyncStatus } from '../shared/types.ts'
 import type { NotionPage } from './notion.ts'
 import type { SettingsService } from './settings.ts'
 import type { JsonStore } from './storage.ts'
 import { buildCards, collectAccountNames } from './cards.ts'
 import { buildDemoCards } from './demo.ts'
+import { checkFields } from './fieldcheck.ts'
+import { resolveRecordKind } from './mapping.ts'
 import { NotionClient, NotionError } from './notion.ts'
 
 const CACHE_FILE = 'cache.json'
@@ -80,9 +82,24 @@ export class SyncService {
       cardCount: this.cache?.cards.length ?? 0,
       recordCount: 0,
       nextRunAt: null,
+      fieldIssues: null,
       ...store.read<Partial<SyncStatus>>(STATUS_FILE, {}),
     }
     this.status.running = false
+    this.backfillRecordKinds()
+  }
+
+  /** Caches written before record kinds existed get them derived locally until the next sync. */
+  private backfillRecordKinds(): void {
+    if (!this.cache)
+      return
+    const mapping = this.settings.notion.mapping
+    for (const card of this.cache.cards) {
+      for (const record of card.history) {
+        if (!record.kind)
+          record.kind = resolveRecordKind(record.type, mapping)
+      }
+    }
   }
 
   isDemo(): boolean {
@@ -150,6 +167,7 @@ export class SyncService {
     const conn = this.settings.notion
     this.status.lastStartedAt = new Date().toISOString()
     this.status.lastReason = reason
+    this.status.fieldIssues = null
     console.log(`[sync] Starting sync (${reason})`)
 
     try {
@@ -161,20 +179,27 @@ export class SyncService {
       const client = new NotionClient(conn.token)
       const cardsSource = await client.resolveDataSource(conn.cardsDb)
       const recordsSource = await client.resolveDataSource(conn.recordsDb)
+      const fieldIssues: FieldIssue[] = [
+        ...checkFields('cards', cardsSource.properties ?? {}, conn.mapping),
+        ...checkFields('records', recordsSource.properties ?? {}, conn.mapping),
+      ]
+      this.status.fieldIssues = fieldIssues
+      if (fieldIssues.length)
+        console.warn(`[sync] ${fieldIssues.length} mapped column(s) missing or of an unexpected type`)
       // Payment accounts are only used to resolve display names; skip on failure without failing the sync
       let accountPages: NotionPage[] = []
       let warning: string | null = null
       if (conn.accountsDb) {
         try {
-          accountPages = await client.queryAll(await client.resolveDataSource(conn.accountsDb))
+          accountPages = await client.queryAll((await client.resolveDataSource(conn.accountsDb)).id)
         }
         catch (error) {
           warning = `扣款账户数据库读取失败，已跳过（扣款账户名称不会显示）：${(error as Error).message}`
           console.warn(`[sync] ${warning}`)
         }
       }
-      const cardPages = await client.queryAll(cardsSource)
-      const recordPages = await client.queryAll(recordsSource)
+      const cardPages = await client.queryAll(cardsSource.id)
+      const recordPages = await client.queryAll(recordsSource.id)
 
       const { cards, recordCount } = buildCards(cardPages, recordPages, conn.mapping, collectAccountNames(accountPages), this.settings.idKey)
       const syncedAt = new Date().toISOString()

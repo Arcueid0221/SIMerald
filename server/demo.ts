@@ -84,6 +84,7 @@ export function buildDemoCards(): SimCard[] {
     history.push({
       id: `demo-${index}-0`,
       type: '首次购买/开卡',
+      kind: 'purchase',
       date: key(date),
       amount: spec.purchasePrice,
       currency: spec.currency,
@@ -102,6 +103,7 @@ export function buildDemoCards(): SimCard[] {
       history.push({
         id: `demo-${index}-${n}`,
         type: '续费/保号',
+        kind: 'renewal',
         date: key(date),
         amount: spec.price,
         currency: spec.currency,
