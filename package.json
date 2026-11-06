@@ -16,7 +16,8 @@
     "build-only": "vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --build",
-    "lint": "eslint . --fix --cache"
+    "lint": "eslint . --fix --cache",
+    "template": "node scripts/notion-template/build.ts"
   },
   "dependencies": {
     "@iconify/vue": "^4.3.0",
