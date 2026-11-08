@@ -127,14 +127,19 @@ npm run check
 
 依次跑 ESLint、`vue-tsc --build`（前端、Worker、Vite 配置三套 tsconfig）、`vite build`。没有单元测试，改了同步或计算逻辑要用上面的本地运行实际点一遍。
 
-## 部署（尚未执行）
+## 部署
 
-以下步骤还没在线上跑过，是计划：
+线上在 <https://sim.arcueidblog.top>。Cloudflare 资源（R2 `esim-notes`、KV `simerald-store`、Access 应用）的现行配置写在运维手册的「SIM 卡片墙」页，这里只写怎么发布：
 
-1. 在 Cloudflare 建 R2 存储桶 `esim-notes` 和一个 KV 命名空间，把 KV 的 id 填进 `wrangler.jsonc`（现在是全 0 的占位）。
-2. 在 Zero Trust → Access 建一个自托管应用，保护 `sim.arcueidblog.top/admin` 和 `sim.arcueidblog.top/api/admin`，只允许站长邮箱；把团队域名和应用的 AUD 填进 `wrangler.jsonc` 的 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`。这两项留空时，没有人能进后台。
-3. `npm run deploy`（先跑 `npm run check`，再 `wrangler deploy`，自定义域名 `sim.arcueidblog.top` 会自动绑定）。
-4. 手机和 Mac 的 Obsidian 在 ESIM 库里装 Remotely Save，选 S3 兼容、填 R2 地址和一个只能访问 `esim-notes` 的 R2 密钥，**不要开加密**（Worker 要能读）。如果插件把文件放在库名前缀下，改 `CARDS_FOLDER` / `LOGOS_FOLDER`。
+```bash
+npx wrangler deploy --dry-run
+```
+
+```bash
+npm run deploy
+```
+
+`npm run deploy` 先跑 `npm run check`，再 `wrangler deploy`，并把当前提交号写进 `GIT_HASH`。`ACCESS_TEAM_DOMAIN`、`ACCESS_AUD` 为空时没有人能进后台。Remotely Save 要用只能访问 `esim-notes` 的 R2 密钥，**不要开加密**（Worker 要能读）。
 
 ## 目录
 
@@ -155,13 +160,22 @@ npm run check
 
 ## 发布记录
 
-### 2026-11-08 改造为 Obsidian + Cloudflare Workers（未部署）
+### 2026-11-09 首次上线
+
+- 部署到 `sim.arcueidblog.top`（Worker 自定义域名），建 R2 存储桶 `esim-notes`、KV `simerald-store`，Access 应用保护 `/admin` 和 `/api/admin`。
+- 实测：
+  - 没登录访问后台接口会被 Access 跳到登录页；带伪造 cookie 不算登录。
+  - 站长登录后在后台点「同步笔记」成功，读进 1 张真实卡片，后台列出了 2 处要检查的地方。
+  - 公开接口只返回号码后 4 位，没有私密字段。
+  - Remotely Save 把文件放在桶根目录、键名不编码，`CARDS_FOLDER` 用 `卡片` 正确。
+- 还没验证：站长登录后在首页能否看到完整号码（取决于 Access 的 cookie 是否发到 `/admin` 以外的路径）。
+
+### 2026-11-08 改造为 Obsidian + Cloudflare Workers
 
 - 基于上游 v0.3.0（`471ca76`）。
 - 去掉 Notion 同步、字段映射、模板生成器，自写登录（scrypt + TOTP + 恢复码），Node 服务器和 Docker 部署。
 - 新增 Worker 后端：R2 读笔记、KV 存快照、Cloudflare Access 登录、后台「同步笔记」按钮和问题列表。
 - 本地 `wrangler dev` 实测：3 篇示例笔记 + 1 篇坏笔记，同步结果、状态和下次续费计算、Logo、跳过坏笔记都符合预期；访客接口不含号码、账户、备注、文件名；未登录访问后台接口返回 401；伪造或过期、aud/iss/签名不对的 Access 令牌都被拒绝（用本地假公钥服务器签的令牌测试）。
-- 还没有：线上部署、真实 Access 登录、Remotely Save 同步到 R2 的实测。
 
 ## 致谢与协议
 
