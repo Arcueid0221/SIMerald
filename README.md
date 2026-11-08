@@ -50,7 +50,7 @@ Obsidian（iCloud 里的 ESIM 库）
 | `.obsidian/types.json` | 属性类型：日期类用日期选择器，金额类用数字，列表类用列表                                                                                                                                                                                                                                       |
 | `SIM 卡总览.base`      | Bases 表格，列出所有卡                                                                                                                                                                                                                                                                         |
 
-Templater 设置：模板文件夹 `模板`，打开「Trigger Templater on new file creation」，文件夹模板 `卡片` → `模板/SIM 卡.md`。
+Templater 设置在 `.obsidian/plugins/templater-obsidian/data.json`：模板文件夹 `模板`，匹配方式「Folder templates」，`卡片` → `模板/SIM 卡.md`。「Trigger Templater on new file creation」这个开关只存在各台设备本地，Mac 和手机要各开一次。
 
 ### 属性和表格
 

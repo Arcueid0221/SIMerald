@@ -1,0 +1,8 @@
+{
+  "data_version": 2,
+  "templates_folder": "模板",
+  "trigger_on_file_creation_mode": "folder",
+  "folder_templates": [
+    { "folder": "卡片", "template": "模板/SIM 卡.md" }
+  ]
+}

@@ -5,6 +5,18 @@
  * 选项来自「模板/下拉选项.md」；运营商还会从已有卡片和 logos/ 里的图片自动收集。
  * 任何一步按 Esc 都会跳过这一项，之后可以在属性里手动补。
  */
+// 在 iCloud 里的库，新建一篇笔记有时会触发两次「新建文件」事件，Templater 会把这个模板同时跑两遍。
+// 用一把按文件路径的锁，第二遍直接退出、什么都不写，否则两遍的内容会叠在同一篇笔记里。
+const LOCK_PATH = tp.config.target_file.path
+window.__simeraldNewCardLocks ??= new Set()
+const duplicateRun = window.__simeraldNewCardLocks.has(LOCK_PATH)
+if (!duplicateRun) {
+  window.__simeraldNewCardLocks.add(LOCK_PATH)
+  setTimeout(() => window.__simeraldNewCardLocks.delete(LOCK_PATH), 10 * 60 * 1000)
+}
+
+if (!duplicateRun) {
+
 const OPTIONS_PATH = '模板/下拉选项.md'
 const CARDS_FOLDER = '卡片'
 const LOGOS_FOLDER = 'logos'
@@ -220,4 +232,5 @@ if (baseName) {
   if (name !== tp.file.title)
     await tp.file.rename(name)
 }
-%>
+}
+-%>
