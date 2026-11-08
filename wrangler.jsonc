@@ -21,9 +21,9 @@
     "CARDS_FOLDER": "卡片",
     "LOGOS_FOLDER": "logos",
     "TIMEZONE": "Asia/Shanghai",
-    // Filled in after the Access application is created; while empty, nobody can use the admin page
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    // Access application protecting /admin and /api/admin; while empty, nobody can use the admin page
+    "ACCESS_TEAM_DOMAIN": "https://sparkling-surf-8e74.cloudflareaccess.com",
+    "ACCESS_AUD": "ccc46150acbfd4bfe2a556089da6981a31cb450672a88d3e570b1c42148a1527"
   },
   "observability": { "enabled": true },
   // 8787 (wrangler's default) is often taken by other local tools. `host` keeps request.url on localhost
