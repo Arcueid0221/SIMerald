@@ -9,7 +9,7 @@ import { safeUrl } from '@/utils/helper'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
 export type CardStyle = 'namecard' | 'dial' | 'bar'
-type SortMode = 'renewal' | 'notion' | 'name' | 'country'
+type SortMode = 'renewal' | 'manual' | 'name' | 'country'
 type EarthViewMode = 'earth' | 'earth-stop' | 'maps' | 'cards' | 'hide'
 
 /** 固定的字节精度配置 */
@@ -66,7 +66,7 @@ const useAppStore = defineStore('app', () => {
   const defaultSort = computed<SortMode>(() => {
     const settings = publicSettings.value?.theme_settings
     const mode = settings?.defaultSort
-    if (mode === 'renewal' || mode === 'notion' || mode === 'name' || mode === 'country')
+    if (mode === 'renewal' || mode === 'manual' || mode === 'name' || mode === 'country')
       return mode
     return 'renewal'
   })

@@ -1,6 +1,6 @@
 /**
  * App initialization: fetches site metadata and card data.
- * Because Notion sync runs once daily, polling every 10 minutes while visible
+ * Data changes only when the owner presses "Sync notes", so polling every 10 minutes while visible
  * and refreshing on tab focus is sufficient.
  */
 

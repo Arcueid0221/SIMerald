@@ -3,8 +3,8 @@
  * `en.ts` must match. vue-i18n syntax: `{name}` interpolates, `|` separates plural forms
  * (`t(key, n)` exposes `n` as `{n}`), and `{ } @ $ |` must be escaped as `{'@'}` when meant literally.
  *
- * `keepAlive`, `recordKinds` and `cycle` use the option names of the Chinese Notion template, so
- * a Chinese site connected to the Chinese template reads exactly as written in Notion.
+ * `keepAlive`, `recordKinds` and `cycle` use the same labels as the card note template, so a Chinese
+ * site reads exactly as written in the notes.
  */
 export default {
   common: {
@@ -44,9 +44,8 @@ export default {
     connectionErrorTitle: '连接服务器失败',
     connectionErrorBody: '请检查网络设置或刷新页面后再试。',
     demoTitle: '当前显示的是演示数据',
-    demoBody: '站长还没有连接 Notion，下面的号码和运营商都是虚构的。',
-    demoConnect: '去后台连接 Notion',
-    demoGuide: '查看接入教程',
+    demoBody: '站长还没有同步过笔记，下面的号码和运营商都是虚构的。',
+    demoSync: '去后台同步笔记',
     noMatch: '没有找到匹配的号码',
     empty: '暂无号码',
   },
@@ -279,97 +278,15 @@ export default {
   admin: {
     title: '后台管理',
     logout: '退出登录',
-    loggedOut: '已退出登录',
     loading: '正在读取…',
     loadFailed: '读取失败，请刷新页面',
     statusLoadFailed: '读取后台状态失败',
-  },
-
-  login: {
-    title: '站长登录',
-    password: '密码',
-    totp: '两步验证',
-    remember: '在这台设备上保持登录 {days} 天',
-    submit: '登录',
-    failed: '登录失败',
-  },
-
-  setup: {
-    failed: '设置失败',
-    verifyFailed: '验证失败',
-    passwordMismatch: '两次输入的密码不一样',
-    step1: {
-      title: '首次设置 · 第 1 步：设置密码',
-      description: 'SIMerald 还没有站长账号。为了防止别人抢先设置，需要输入服务器上生成的一次性设置密钥：在服务器上运行 docker logs simerald 能看到，也保存在数据目录的 setup-key.txt 里。',
-      setupKey: '设置密钥',
-      setupKeyHelp: '格式类似 ABCD-EFGH-IJKL',
-      password: '站长密码',
-      passwordHelp: '至少 {min} 位，建议用密码管理器生成',
-      passwordConfirm: '再输一次密码',
-      next: '下一步',
+    signIn: {
+      title: '需要登录',
+      expiredTitle: '登录已过期',
+      description: '后台由 Cloudflare Access 保护，点下面的按钮后输入站长邮箱，收到验证码就能进来。',
+      button: '去登录',
     },
-    step2: {
-      title: '首次设置 · 第 2 步：绑定两步验证',
-      description: '以后登录除了密码，还要输入手机验证器 App 上的 6 位数字，这个数字每 30 秒变一次。',
-      code: 'App 上显示的 6 位数字',
-      submit: '验证并完成',
-    },
-    step3: {
-      title: '首次设置 · 第 3 步：保存恢复码',
-      saved: '我已经把恢复码保存好了',
-      enter: '进入后台',
-    },
-  },
-
-  recovery: {
-    notice: '这些恢复码只显示这一次。手机丢了、验证器 App 打不开时，可以用其中一个代替 6 位验证码登录，每个只能用一次。请保存到密码管理器或打印出来。',
-    copyAll: '复制全部',
-    download: '下载为文本文件',
-    copied: '恢复码已复制',
-    fileHeader: 'SIMerald 恢复码（每个只能用一次）',
-  },
-
-  totp: {
-    scan: '用手机上的验证器 App（Google Authenticator、Microsoft Authenticator、1Password 等）扫描左边的二维码。',
-    manual: '扫不了的话，在 App 里选「手动输入密钥」，填下面这串：',
-    copySecret: '复制密钥',
-    secretCopied: '密钥已复制',
-  },
-
-  security: {
-    title: '账号安全',
-    recoveryLeft: '剩余恢复码',
-    recoveryCount: '{n} 个',
-    sessions: '已登录的设备',
-    sessionCount: '{n} 台',
-    changePassword: '修改密码',
-    rebind: '重新绑定两步验证',
-    regenerate: '重新生成恢复码',
-    logoutOthers: '退出其他设备',
-    savedDone: '我已保存，完成',
-    newCode: '新 App 上显示的 6 位数字',
-    verifyReplace: '验证并替换',
-    hints: {
-      password: '修改密码后，其他设备会被退出登录。',
-      rebind: '换手机或重装验证器 App 时使用。完成后旧的验证码和恢复码都会作废。',
-      recovery: '旧的恢复码会全部作废。',
-    },
-    currentPassword: '当前密码',
-    code: '验证码',
-    codeHelp: '验证器 App 上的 6 位数字，或一个恢复码',
-    newPassword: '新密码',
-    newPasswordHelp: '至少 {min} 位',
-    newPasswordConfirm: '再输一次新密码',
-    submit: {
-      password: '修改密码',
-      rebind: '下一步',
-      recovery: '生成新的恢复码',
-    },
-    failed: '操作失败',
-    passwordMismatch: '两次输入的新密码不一样',
-    passwordChanged: '密码已修改，其他设备已退出登录',
-    rebound: '两步验证已重新绑定，旧手机上的验证码已失效',
-    othersLoggedOut: '其他设备已退出登录',
   },
 
   theme: {
@@ -380,95 +297,28 @@ export default {
   },
 
   sync: {
-    title: '数据同步',
-    description: 'SIMerald 每天从 Notion 拉取一次数据。在 Notion 里改完想马上看到，点「立即同步」。',
-    syncNow: '立即同步',
+    title: '同步笔记',
+    description: '在 Obsidian 里改完卡片，先让 Remotely Save 把笔记传到 R2，再点「同步笔记」。读取的是存储桶里「{folder}」文件夹下的笔记。',
+    syncNow: '同步笔记',
     status: '状态',
     cards: '卡片',
     cardCount: '{n} 张',
-    records: '消费记录',
+    records: '续费记录',
     recordCount: '{n} 条',
     lastSuccess: '上次成功',
-    nextRun: '下次自动同步',
-    dailyTime: '每天同步时间',
-    timezone: '时区',
-    saveSchedule: '保存时间',
-    scheduleSaved: '同步时间已保存',
     failed: '同步失败',
     failedWith: '同步失败：{error}',
-    done: '同步完成：{cards}卡，{records}消费记录',
+    done: '同步完成：{cards}卡，{records}续费记录',
     errorAt: '{time}：{error}',
     state: {
-      notConnected: '未连接 Notion（正在显示演示数据）',
       running: '正在同步…',
       failed: '上次同步失败',
       ok: '同步正常',
-      never: '还没有同步过',
+      never: '还没有同步过（首页正在显示演示数据）',
     },
     issues: {
-      title: '有 {n} 个字段对不上，对应的信息不会显示。改 Notion 列名，或在「Notion 连接」里换字段预设 / 自定义映射：',
-      missing: '：找不到这一列',
-      type: '：类型是 {actual}，应为 {expected}',
-      legend: '● 影响首页显示 ○ 只影响站长可见的信息',
-      db: {
-        cards: 'SIM 卡库',
-        records: '消费记录库',
-      },
-    },
-  },
-
-  notion: {
-    title: 'Notion 连接',
-    description: 'SIMerald 只读取 Notion，不会修改里面的任何内容。',
-    steps: {
-      copy: '1. 把 SIMerald 的 Notion 模板复制到你的工作区（模板链接和详细步骤见{guide}）。',
-      guide: '接入教程',
-      integration: '2. 打开 notion.so/profile/integrations，新建一个 Internal integration，权限只勾「读取内容」，复制它的 token。',
-      connect: '3. 在 Notion 里打开模板页面，点右上角 ··· →「连接」，选中刚建的 integration。',
-      detect: '4. 把 token 填到下面，点「自动识别」，确认识别结果后点「保存」，会立即同步一次。',
-    },
-    token: {
-      help: 'token 只保存在服务器上，不会再显示出来',
-      configured: '已配置。留空表示不修改；填新的会覆盖旧的',
-      fromEnv: 'token 来自服务器的环境变量，这里不能修改',
-      configuredPlaceholder: '••••••••（已配置）',
-      clear: '删除已保存的 token（删除后会显示演示数据）',
-    },
-    detect: {
-      button: '自动识别',
-      running: '识别中…',
-      choose: '找到 {n} 套模板，选择要连接的那一套：',
-      found: '已识别{preset}：{databases}。点「保存」完成连接',
-      recordsMissing: '找到了 SIM 卡库，但没找到关联的消费记录库，请确认它也「连接」给了这个 integration',
-      none: '没找到 SIMerald 模板。请确认已复制模板，并在模板页面右上角 ··· →「连接」里选中了这个 integration',
-      failed: '自动识别失败',
-      cardsFallback: 'SIM 卡',
-      noRecords: '（没找到消费记录库）',
-      accountsFallback: '支付账户',
-    },
-    databases: {
-      cards: 'SIM 卡数据库',
-      records: '消费记录数据库',
-      accounts: '扣款账户数据库（可选）',
-      help: '数据库链接或 ID',
-      accountsHelp: '用来显示扣款账户名称',
-      optional: '可留空',
-    },
-    preset: '字段预设',
-    presetHelp: '复制官方模板时选对应语言即可；数据库列名和模板不一样时选「自定义映射」。',
-    presets: {
-      zh: '中文模板',
-      en: 'English template',
-      custom: '自定义映射（JSON）',
-    },
-    mapping: '字段映射 JSON',
-    mappingHelp: '在中文模板的基础上覆盖：左边是 SIMerald 的字段，右边是你 Notion 数据库里的列名。只需要写和中文模板不一样的部分。',
-    save: {
-      running: '正在保存并同步…',
-      saved: '已保存',
-      synced: '已保存并完成同步',
-      syncFailed: '已保存，但同步失败：{error}',
-      fieldIssues: '已保存并完成同步，但有 {n} 个字段对不上，详见「数据同步」',
+      skippedTitle: '有 {n} 篇笔记没读进来：',
+      warningsTitle: '有 {n} 处需要检查（卡片已显示）：',
     },
   },
 
@@ -509,7 +359,7 @@ export default {
         help: '卡片墙的默认顺序',
         options: {
           renewal: '按下次续费日期',
-          notion: '按 Notion 顺序',
+          manual: '按笔记文件名',
           name: '按名称',
           country: '按国家/地区',
         },
@@ -606,55 +456,31 @@ export default {
     },
   },
 
-  // API and sync errors, keyed by the codes in server/*.ts (AppError / NotionError)
+  // API and sync errors, keyed by the codes in worker/*.ts (AppError / NoteError)
   errors: {
-    retryIn: '{message}（约 {minutes} 分钟后）',
     http: {
       network: '连接服务器失败，请检查网络',
       requestFailed: '请求失败（{status}）',
       unsupportedMediaType: '请求格式不对',
       payloadTooLarge: '请求内容太大',
       badJson: '请求内容不是合法的 JSON',
-      badUrl: '网址格式不对',
       csrf: '请求来源校验失败',
       notFound: '接口不存在',
       methodNotAllowed: '不支持的请求方法',
       internal: '服务器内部错误',
     },
     auth: {
-      loginRequired: '请先登录',
-      passwordTooShort: '密码至少 {min} 位',
-      passwordTooLong: '密码太长',
-      tooManyAttempts: '尝试次数过多，请稍后再试',
-      badCredentials: '密码或验证码错误',
-      setupInvalid: '设置流程已失效，请重新开始',
-      setupExpired: '设置流程已超时，请重新开始',
-      alreadySetUp: '站长账号已经设置过了',
-      badSetupKey: '设置密钥不正确',
-      badTotp: '验证码不正确，请确认手机时间准确后重试',
-      setupRequired: '请先完成首次设置',
+      loginRequired: '请先通过 Cloudflare Access 登录',
     },
-    notion: {
-      tokenRequired: '请先填写 Notion token',
-      badToken: 'Notion token 格式不对',
-      unauthorized: 'Notion token 无效或已被撤销',
-      forbidden: 'Notion integration 没有读取权限',
-      notFound: '找不到数据库：ID 不对，或者没有把页面共享给这个 integration',
-      rateLimited: 'Notion 请求太频繁，请稍后再试',
-      apiError: 'Notion 接口出错（{status} {code}）：{message}',
-      network: '连不上 Notion：{message}',
-      noDataSource: '这个数据库里没有数据源',
-    },
-    settings: {
-      badSyncTime: '同步时间格式应为 HH:mm，例如 05:00',
-      badTimezone: '时区无效，例如 Asia/Shanghai',
-      badDatabaseId: '数据库 ID 格式不对：{value}',
-      badMapping: '字段映射不是合法的 JSON',
+    note: {
+      noFrontmatter: '笔记开头没有属性区（--- ... ---）',
+      badFrontmatter: '属性区格式不对：{message}',
+      noCarrier: '缺「{property}」属性',
+      ignoredProperty: '属性「{name}」的值读不懂，已忽略',
+      vanished: '同步时笔记不见了',
+      check: '{problem}',
     },
     sync: {
-      noToken: '还没有配置 Notion token',
-      noDatabases: '还没有填写 SIM 卡数据库和消费记录数据库的 ID',
-      accountsSkipped: '扣款账户数据库读取失败，已跳过（扣款账户名称不会显示）：{cause}',
       failed: '同步失败：{message}',
     },
   },

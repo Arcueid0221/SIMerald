@@ -1,0 +1,16 @@
+filters:
+  and:
+    - file.inFolder("卡片")
+views:
+  - type: table
+    name: 全部卡片
+    order:
+      - file.name
+      - 运营商
+      - 国家
+      - 类型
+      - 续费周期
+      - 续费金额
+      - 币种
+      - 下次续费（手动）
+      - 停用日期

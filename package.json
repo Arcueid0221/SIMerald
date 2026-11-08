@@ -3,21 +3,21 @@
   "type": "module",
   "version": "0.3.0",
   "private": true,
-  "description": "Public card-wall website for a personal SIM and eSIM collection synced from Notion, based on the Komari Emerald theme.",
+  "description": "Public card-wall website for a personal SIM and eSIM collection kept as Obsidian notes, running on Cloudflare Workers. Based on the Komari Emerald theme.",
   "license": "MIT",
   "engines": {
     "node": ">=22.18.0"
   },
   "scripts": {
     "dev": "vite",
-    "dev:server": "node --watch server/index.ts",
-    "start": "node server/index.ts",
+    "dev:worker": "npm run build-only && wrangler dev",
     "build": "run-p type-check \"build-only {@}\" --",
     "build-only": "vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix --cache",
-    "template": "node scripts/notion-template/build.ts"
+    "check": "eslint . && vue-tsc --build && vite build",
+    "deploy": "npm run check && wrangler deploy --var GIT_HASH:$(git rev-parse --short HEAD)"
   },
   "dependencies": {
     "@iconify/vue": "^4.3.0",
@@ -30,15 +30,16 @@
     "pinia": "^3.0.4",
     "reka-ui": "^2.6.1",
     "tailwind-merge": "^3.4.0",
-    "uqr": "^0.1.3",
     "vue": "^3.5.28",
     "vue-echarts": "^8.0.1",
     "vue-i18n": "^11.4.16",
     "vue-router": "^5.0.2",
-    "vue-sonner": "^2.0.9"
+    "vue-sonner": "^2.0.9",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.4.3",
+    "@cloudflare/workers-types": "^5.20261108.1",
     "@iconify/json": "^2.2.442",
     "@tailwindcss/vite": "^4.1.16",
     "@tsconfig/node24": "^24.0.4",
@@ -57,7 +58,8 @@
     "vite": "^7.3.1",
     "vite-plugin-static-copy": "^3.2.0",
     "vite-plugin-vue-devtools": "^8.0.6",
-    "vue-tsc": "^3.2.4"
+    "vue-tsc": "^3.2.4",
+    "wrangler": "4.120.0"
   },
   "overrides": {
     "tinypool": "^2.1.2"

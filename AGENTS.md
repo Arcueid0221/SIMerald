@@ -1,63 +1,46 @@
 # AGENTS.md
 
-Repository guide for `simerald`.
+Repository guide for `simerald` (Obsidian + Cloudflare Workers adaptation).
 
 ## Overview
 
-- **SIMerald**: A self-hosted SIM / eSIM collection card-wall website backed by Notion and forked from the Komari Emerald theme.
-- **Frontend**: Vue 3 + Vite + reka-ui + Tailwind CSS v4 in `src/`. The web UI is bilingual (Simplified Chinese and English) via `vue-i18n`, with dictionaries in `src/i18n/locales/`.
-- **Backend**: Zero-dependency Node.js (`>= 22.18.0`) running TypeScript directly via native type stripping in `server/`, with no separate backend build step.
-- **Shared**: `shared/` holds TypeScript types and the theme settings schema shared by both frontend and backend.
-- **Documentation**: Read [`docs/design.md`](docs/design.md) and [`docs/configuration.md`](docs/configuration.md) before changing application behavior. User-facing Notion setup guides live in [`docs/notion-setup.md`](docs/notion-setup.md) and [`docs/notion-setup.zh-CN.md`](docs/notion-setup.zh-CN.md).
+- **What it is**: A public card wall for a personal SIM / eSIM collection. Card data lives in an Obsidian vault (one note per card), is synced to an R2 bucket by the Remotely Save plugin, and is read by a Cloudflare Worker when the owner presses "Sync notes" in the admin page.
+- **Frontend**: Vue 3 + Vite + reka-ui + Tailwind CSS v4 in `src/`, bilingual via `vue-i18n` (`src/i18n/locales/`). Built into `dist/` and served by Workers Static Assets.
+- **Backend**: Cloudflare Worker in `worker/` (bindings: `ASSETS`, R2 `NOTES`, KV `STORE`; config in `wrangler.jsonc`). Only `/api/*` and `/logos/*` reach the Worker.
+- **Auth**: Cloudflare Access protects `/admin` and `/api/admin`. `worker/access.ts` verifies the Access JWT (header or `CF_Authorization` cookie) against the team's public keys on every request; there is no other login.
+- **Shared**: `shared/` holds types and the theme settings schema used by both sides.
+- **Docs**: user-facing docs are in [`README.md`](README.md) (Chinese); design notes in [`docs/design.md`](docs/design.md).
 
 ## Repository Structure
 
-- `src/`: Frontend application (see [`src/AGENTS.md`](src/AGENTS.md)), including `src/i18n/` (vue-i18n setup and `zh-CN` / `en` dictionaries), `src/utils/links.ts` (`REPO_URL`, `notionSetupUrl()` picking the tutorial in the UI language) and `src/utils/financeHelper.ts` (38 currencies, including `AED`, `MOP` and `TWD`; live rates from `frankfurter.app`, falling back to `open.er-api.com`).
-- `server/`: Backend service:
-  - `index.ts`: HTTP server and API routes (including `POST /api/admin/notion/detect`, `PUT /api/admin/notion` with `preset`, and `GET /api/cards?lang=` for demo data); turns `AppError` into `ApiErrorBody` responses
-  - `errors.ts`: `AppError(status, code, message, params, retryAfter)`, the error type whose `code` the UI translates
-  - `config.ts`: Environment variable and path configuration
-  - `auth.ts`: Single-owner authentication (scrypt password, TOTP, recovery codes, sessions, rate limiting)
-  - `notion.ts`: Read-only Notion API client (`2025-09-03` data sources API: `resolveDataSource` returning the data source object with schema, `getDataSource`, `searchDataSources`) and property extractors
-  - `mapping.ts`: Built-in Notion column presets (`PRESETS.zh` / `DEFAULT_MAPPING` and `PRESETS.en`), bilingual `statusValues`, `recordTypes` and `keepAliveValues` vocabularies, `resolveMapping`, `resolveRecordKind`, `resolveKeepAliveCode`, and custom JSON merging (`mergeMapping`)
-  - `detect.ts`: Auto-detects Notion template databases and preset shared with the integration (`detectTemplates`)
-  - `fieldcheck.ts`: Non-fatal schema health check (`checkFields`) comparing mapped columns of `cards` and `records` against Notion data source property schemas
-  - `cards.ts`: Transforms Notion pages into `SimCard` and `SimRecord` objects (record `kind` via `resolveRecordKind` and card `keepAliveCodes` via `resolveKeepAliveCode` from `mapping.ts`), computes HMAC `opaqueId`
-  - `view.ts`: Whitelist-based masking (`toPublicCard`, `publicRecord`) for unauthenticated responses
-  - `sync.ts`: Daily scheduled sync, startup stale-cache check, `backfillCache` for older caches (record `kind`, `keepAliveCodes`), sync errors and warnings as codes, `fieldIssues` reporting, and `cache.json` / `sync-status.json` persistence
-  - `settings.ts`: Persistent site, theme, sync, and Notion connection settings (`notion.preset` and `notion.mapping`)
-  - `logos.ts`: Serves carrier logos from `<DATA_DIR>/logos/` at `/logos/<file>`
-  - `demo.ts`: Fictional dataset used when no Notion token is configured, generated in either template language (`buildDemoCards(lang)`)
-- `shared/types.ts`: Shared API and domain types (including `RecordKind`, `KeepAliveCode`, `FieldIssue`, `DetectMatch`, `ErrorParams`, `ApiErrorBody`, `SyncReason`).
-- `shared/settings-schema.ts`: Theme settings schema (`SETTINGS_SCHEMA`) driving both backend sanitization and the admin UI form; it holds no labels (section ids and keys map to `settings.*` in the locale dictionaries).
-- `scripts/notion-template/`: Official v1 Notion template generator and validator:
-  - `template.ts`: Single source of truth for the Chinese and English Notion templates (databases, columns, options, descriptions, formulas, sample rows, usage guide, 30 countries with calling codes, 25 currencies with CNY rate ranges).
-  - `build.ts`: Validates the template definition against backend presets (`checkFields`), vocabularies (status, record types, keep-alive codes), card-kind detection, cycle parsing, flag emoji, `financeHelper` currencies, relation symmetry, and sample options, and generates `docs/notion-template/template.md` and `docs/notion-template/template.zh-CN.md` (excluded from ESLint). Covered by `tsconfig.server.json` and ESLint Node overrides.
-- `public/assets/flags/`: Twemoji flag SVGs, served as `/assets/flags/<ISO>.svg`.
-- `deploy/compose.yaml`: Example Docker Compose deployment; `Dockerfile` builds the frontend in stage 1 and runs `node server/index.ts` in stage 2.
+- `worker/index.ts`: routes, CSRF header check, `AppError` → `ApiErrorBody`
+- `worker/access.ts`: `adminEmail()`; `DEV_ADMIN_EMAIL` (`.dev.vars`) stands in for a login on localhost only
+- `worker/bucket.ts`: folder listing with URL-decoded key matching (`listFolder`, `getFile`)
+- `worker/obsidian.ts`: `parseNote()` — YAML properties (failsafe schema, all text) and the first table with a date column
+- `worker/cards.ts`: `buildCard()` (note → `StoredCard`, replaces the old Notion formulas) and `withToday()` (status / next renewal for the current date, run on every read)
+- `worker/sync.ts`: `runSync()`, KV keys `snapshot` and `sync-status`
+- `worker/view.ts`: allowlist redaction for visitors
+- `worker/settings.ts`: theme settings and the HMAC key for public card IDs (KV keys `theme`, `id-key`)
+- `worker/logos.ts`, `worker/demo.ts`, `worker/vocab.ts` (status / record type / keep-alive vocabularies), `worker/errors.ts`, `worker/env.ts`
+- `src/views/AdminView.vue`, `src/components/admin/SyncSection.vue`, `ThemeSection.vue`: the admin page
+- `docs/obsidian-template/`: template note and Bases view to copy into the vault
 
 ## Commands
 
-Run from the repository root using `npm` (lockfile: `package-lock.json`):
-
 ```bash
-npm run dev:server   # Backend on :25780 (serves demo data when no Notion token is configured)
-npm run dev          # Vite dev server, proxies /api to the backend
-npm run template     # Validate Notion template definition and regenerate docs/notion-template/*.md (--check to only check, --json zh|en to print JSON)
-npx eslint .         # Lint frontend, backend, shared, and scripts code
-npm run type-check   # vue-tsc --build across app and server tsconfigs (includes scripts/**/*.ts)
-npm run build-only   # Build frontend production bundle into dist/
+npm run dev:worker   # build frontend, then wrangler dev on http://127.0.0.1:8790 (local R2/KV in .wrangler/)
+npm run dev          # Vite dev server; proxies /api and /logos to :8790
+npm run check        # eslint + vue-tsc --build (app, worker, node tsconfigs) + vite build
+npm run deploy       # check, then wrangler deploy
 ```
 
-There is no automated unit test suite; `npm run template -- --check` validates the Notion template definitions against backend extractors and helpers. Verify changes by running `npm run template -- --check`, `npx eslint .`, `npm run type-check`, and `npm run build-only`, and by exercising the backend against demo data.
+There is no unit test suite. After changing sync or card logic, run `npm run dev:worker`, put notes into local R2 with `npx wrangler r2 object put "esim-notes/卡片/<name>.md" --file <file> --local`, and exercise `/api/admin/sync` and `/api/cards` as owner (`.dev.vars`) and as a visitor (`npx wrangler dev --port 8791 --host sim.test`).
 
 ## Key Rules
 
-- **Privacy whitelist**: Anything not explicitly copied in `server/view.ts` (`toPublicCard` and `publicRecord`) must never reach unauthenticated `/api/cards` responses. `SimRecord.kind` and `SimCard.keepAliveCodes` are public; owner-only fields are: full `number`, full `type`, `device`, `balance`, `balanceUpdatedAt`, `services`, `account`, `paymentAccounts`, `dataCheck`, `notionUrl`, and expense record `title` and `accounts`.
-- **Erasable-only TypeScript in `server/`, `shared/`, and `scripts/`**: Because Node executes `.ts` files directly via type stripping, do not use TypeScript `enum`, parameter properties, namespaces, or import aliases in `server/`, `shared/`, or `scripts/`. Always include `.ts` extensions in relative imports.
-- **Notion template maintenance**: Always edit `scripts/notion-template/template.ts` first and run `npm run template` to regenerate `docs/notion-template/template.md` and `template.zh-CN.md` (never hand-edit generated files). When updating the published Notion templates, apply changes to both Chinese and English templates and bump the version in the template title when columns change. In the published templates, `Total Spent CNY` (`卡消费合计 CNY`) is a rollup (sum of `Amount CNY`) and `First Purchase` (`首次购买日期`) is a rollup (earliest `Date`); formulas that read related pages (`Valid Until` / `当前有效期至` and both `⚠️ Data Check` / `⚠️ 数据检查` columns) must be pasted manually in the Notion UI when maintaining templates with MCP tools, which reject cross-relation formulas.
-- **UI text goes through the dictionaries**: Never hard-code user-visible text in `src/`. Add the key to `src/i18n/locales/zh-CN.ts` (the source and type schema) and the matching English text to `en.ts`; use `t()` from `useI18n()` in components and `i18n.global.t` in plain modules. Values derived from Notion that the app understands (status, card kind, keep-alive codes, cycle, record kind, country) are translated from codes; free text from Notion is shown as written.
-- **Errors carry codes**: Errors that reach the browser are `AppError`s (or `NotionError`s with `appCode`) with a stable `code`, optional `params`, and an English `message`; add `errors.<code>` to both dictionaries when introducing one. Sync errors and warnings are stored with `lastErrorCode` / `lastWarningCode` for the same reason.
-- **Secret handling**: Secrets (Notion token, password hash, TOTP secret, session keys) belong only in the data directory or environment variables—never in the repository.
-- **CSRF header**: All state-changing API requests require the `X-SIMerald-Request: 1` header.
-- **Preserve the Emerald visual language**: Reuse existing primitives in `src/components/ui/` and OKLCH design tokens in `src/styles/main.css` rather than introducing new component libraries or ad-hoc styles.
+- **Privacy allowlist**: anything not copied in `worker/view.ts` must never reach a visitor. Owner-only: full `number`, `type`, `device`, `balance`, `balanceUpdatedAt`, `services`, `account`, `paymentAccounts`, `dataCheck`, `source`, and record `title` / `accounts`.
+- **Admin routes call `requireAdmin`**; do not rely on Access alone.
+- **State-changing requests need `X-SIMerald-Request: 1`.**
+- **UI text goes through the dictionaries** (`zh-CN.ts` is the schema, `en.ts` must match). Errors reaching the browser carry a stable `code` with `errors.<code>` in both dictionaries.
+- **No secrets in the repo**: R2 keys live only in Remotely Save; `.dev.vars` is git-ignored.
+- **Preserve the Emerald visual language**: reuse `src/components/ui/` and the tokens in `src/styles/main.css`.

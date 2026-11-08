@@ -40,8 +40,9 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 
-# SIMerald runtime data directory (contains password hash and Notion token)
-data/
+# Wrangler: local dev state and dev-only variables
+.wrangler/
+.dev.vars
 .mimocode
 .zcode
 .playwright-mcp

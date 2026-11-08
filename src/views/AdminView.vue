@@ -1,19 +1,15 @@
 <script setup lang="ts">
 import type { AdminStatus } from '@shared/types'
 import { Icon } from '@iconify/vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import LoginPanel from '@/components/admin/LoginPanel.vue'
-import NotionSection from '@/components/admin/NotionSection.vue'
-import SecuritySection from '@/components/admin/SecuritySection.vue'
-import SetupPanel from '@/components/admin/SetupPanel.vue'
+import AdminSection from '@/components/admin/AdminSection.vue'
 import SyncSection from '@/components/admin/SyncSection.vue'
 import ThemeSection from '@/components/admin/ThemeSection.vue'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/stores/app'
-import { api, ApiError } from '@/utils/api'
-import { refreshData } from '@/utils/init'
+import { ACCESS_LOGIN_URL, ACCESS_LOGOUT_URL, api, ApiError } from '@/utils/api'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -21,23 +17,20 @@ const { t } = useI18n()
 
 const status = ref<AdminStatus | null>(null)
 const loadingStatus = ref(false)
-
-const mode = computed(() => {
-  if (appStore.publicSettings?.setupRequired)
-    return 'setup'
-  return appStore.isLoggedIn ? 'settings' : 'login'
-})
+/** True when the Access session ended while the page was open */
+const sessionExpired = ref(false)
 
 async function loadStatus() {
-  if (mode.value !== 'settings')
+  if (!appStore.isLoggedIn)
     return
   loadingStatus.value = true
   try {
     status.value = await api.adminStatus()
   }
   catch (e) {
-    if (e instanceof ApiError && e.status === 401)
-      await refreshData().catch(() => {})
+    // An expired Access session answers /api/admin with a redirect to the login page, which fetch cannot follow
+    if (e instanceof ApiError && (e.status === 0 || e.status === 401))
+      sessionExpired.value = true
     else
       window.$message.error(e instanceof ApiError ? e.message : t('admin.statusLoadFailed'))
   }
@@ -46,24 +39,17 @@ async function loadStatus() {
   }
 }
 
-async function handleLoggedIn() {
-  await refreshData().catch(() => {})
-  await loadStatus()
+/** Full page load so Cloudflare Access can show its login page */
+function signIn() {
+  window.location.assign(ACCESS_LOGIN_URL)
 }
 
-async function logout() {
-  try {
-    await api.logout()
-  }
-  finally {
-    status.value = null
-    await refreshData().catch(() => {})
-    window.$message.success(t('admin.loggedOut'))
-  }
+function signOut() {
+  window.location.assign(ACCESS_LOGOUT_URL)
 }
 
-watch(mode, (next) => {
-  if (next === 'settings' && !status.value)
+watch(() => appStore.isLoggedIn, (loggedIn) => {
+  if (loggedIn && !status.value)
     loadStatus()
 })
 
@@ -82,22 +68,29 @@ onMounted(() => {
       <div class="text-lg font-bold">
         {{ t('admin.title') }}
       </div>
-      <Button v-if="mode === 'settings'" variant="ghost" size="sm" class="ml-auto bg-background/50 hover:bg-background" @click="logout">
+      <span v-if="status?.email" class="text-xs text-muted-foreground truncate">{{ status.email }}</span>
+      <Button v-if="appStore.isLoggedIn" variant="ghost" size="sm" class="ml-auto bg-background/50 hover:bg-background" @click="signOut">
         <Icon icon="tabler:logout" /> {{ t('admin.logout') }}
       </Button>
     </div>
 
-    <SetupPanel v-if="mode === 'setup'" @done="handleLoggedIn" />
-    <LoginPanel v-else-if="mode === 'login'" @done="handleLoggedIn" />
+    <AdminSection
+      v-if="!appStore.isLoggedIn || sessionExpired"
+      :title="sessionExpired ? t('admin.signIn.expiredTitle') : t('admin.signIn.title')"
+      icon="tabler:lock"
+      :description="t('admin.signIn.description')"
+    >
+      <Button @click="signIn">
+        <Icon icon="tabler:login-2" /> {{ t('admin.signIn.button') }}
+      </Button>
+    </AdminSection>
     <template v-else>
       <div v-if="!status" class="py-12 text-center text-sm text-muted-foreground">
         {{ loadingStatus ? t('admin.loading') : t('admin.loadFailed') }}
       </div>
       <template v-else>
         <SyncSection :status="status" @update="status = $event" />
-        <NotionSection :status="status" @update="status = $event" />
         <ThemeSection />
-        <SecuritySection :status="status" @changed="loadStatus" />
       </template>
     </template>
   </div>

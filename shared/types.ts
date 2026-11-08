@@ -1,6 +1,6 @@
 /**
- * Shared types between frontend and backend.
- * Executed directly via Node native type-stripping; must contain only type declarations (no runtime syntax like enums).
+ * Shared types between frontend and Worker backend.
+ * Must contain only type declarations (no runtime syntax like enums).
  */
 
 export type CardStatus = 'active' | 'expired' | 'cancelled'
@@ -11,17 +11,17 @@ export type CardKind = 'physical' | 'adapter' | 'embedded' | 'virtual'
 /** Internal category of an expense record, resolved by the backend from the record type label */
 export type RecordKind = 'purchase' | 'renewal' | 'topup' | 'other'
 
-/** Keep-alive action matching an option of the official templates; lets the UI translate the label */
+/** Keep-alive action with a known label; lets the UI translate it */
 export type KeepAliveCode = 'topup' | 'addon' | 'use' | 'balanceChange' | 'autoCharge' | 'plan'
 
-/** Notion select option colors */
-export type NotionColor
+/** Accent color of the card type tag */
+export type TagColor
   = | 'default' | 'gray' | 'brown' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'red'
 
 export interface SimRecord {
-  /** Opaque ID derived from the Notion page ID (irreversible) */
+  /** Row ID, unique within the card */
   id: string
-  /** Transaction category label as written in Notion */
+  /** Record type label as written in the note */
   type: string
   kind: RecordKind
   /** Transaction date (YYYY-MM-DD) */
@@ -32,18 +32,18 @@ export interface SimRecord {
   currency: string
   /** Exchange rate at transaction time (1 unit of foreign currency in CNY) */
   rate: number | null
-  /** Equivalent amount in CNY (calculated by Notion formula) */
+  /** Equivalent amount in CNY (amount × rate; equals amount for CNY) */
   amountCNY: number | null
   /** New expiration date after this transaction (YYYY-MM-DD) */
   extendsTo: string | null
-  /** Returned only when authenticated: record title */
+  /** Returned only when authenticated: note column */
   title?: string
   /** Returned only when authenticated: payment account names */
   accounts?: string[]
 }
 
 export interface SimCard {
-  /** Opaque ID derived from the Notion page ID, used in detail URLs; raw Notion link is only in notionUrl when authenticated */
+  /** Opaque ID derived from the note path (keyed hash), used in detail URLs */
   id: string
   /** Display name, e.g. "Harbour Mobile · 0123" */
   name: string
@@ -58,10 +58,10 @@ export interface SimCard {
   /** Country or region name */
   countryName: string
   typeKind: CardKind
-  typeColor: NotionColor
-  /** Actions required to keep the number active, as written in Notion */
+  typeColor: TagColor
+  /** Actions required to keep the number active, as written in the note */
   keepAlive: string[]
-  /** Same order as `keepAlive`; null for labels that are not template options */
+  /** Same order as `keepAlive`; null for labels outside the known vocabulary */
   keepAliveCodes: (KeepAliveCode | null)[]
   /** Renewal cycle in days, or 0 if irregular */
   cycleDays: number
@@ -84,12 +84,10 @@ export interface SimCard {
   cancelledAt: string | null
   firstPurchaseAt: string | null
   totalSpentCNY: number | null
-  /** Raw renewal urgency text, usable for sorting */
-  urgency: string | null
-  /** Display order from Notion */
+  /** Display order: position of the note in file-name order */
   order: number
   history: SimRecord[]
-  /** Carrier logo URL, populated by the API when a matching file exists in the data logos/ directory */
+  /** Carrier logo URL, populated when a matching file exists in the vault's logos/ folder */
   logo?: string | null
   // Fields below are returned only when authenticated
   /** Raw card type label */
@@ -102,8 +100,10 @@ export interface SimCard {
   services?: string[]
   account?: string | null
   paymentAccounts?: string[]
+  /** Problems found in the note, joined into one line; null when the note looks fine */
   dataCheck?: string | null
-  notionUrl?: string | null
+  /** Path of the source note inside the vault */
+  source?: string | null
 }
 
 export type ThemeSettings = Record<string, string | number | boolean>
@@ -119,22 +119,17 @@ export interface ApiErrorBody {
   error: string
   code: string
   params?: ErrorParams
-  /** Seconds until the next attempt is allowed (429 only) */
-  retryAfter?: number
 }
-
-/** Why a sync started */
-export type SyncReason = 'startup' | 'daily' | 'settings' | 'manual'
 
 export interface SiteInfo {
   sitename: string
   version: string
   gitHash: string
-  /** True when Notion is not configured and built-in demo data is served */
+  /** True before the first successful sync, when built-in demo data is served */
   demo: boolean
   syncedAt: string | null
+  /** True when the request carries a valid Cloudflare Access login */
   loggedIn: boolean
-  setupRequired: boolean
   theme_settings: ThemeSettings
 }
 
@@ -145,81 +140,37 @@ export interface CardsResponse {
   full: boolean
 }
 
+/** A note that was skipped or read with problems during the last sync */
+export interface NoteIssue {
+  /** Note path inside the vault */
+  file: string
+  /** Translatable code, e.g. `note.badFrontmatter` */
+  code: string
+  params: ErrorParams
+  /** English message for logs */
+  message: string
+  /** True when the note was skipped entirely */
+  skipped: boolean
+}
+
 export interface SyncStatus {
-  running: boolean
-  lastStartedAt: string | null
   lastFinishedAt: string | null
   lastSuccessAt: string | null
-  /** English message of the last failure; installations upgraded from v0.2 may hold a Chinese one */
+  /** English message of the last failure */
   lastError: string | null
-  /** Translatable code of `lastError`; null for messages written before v0.3 */
+  /** Translatable code of `lastError` */
   lastErrorCode: string | null
   lastErrorParams: ErrorParams | null
-  /** Warning when sync succeeded with some entries skipped */
-  lastWarning: string | null
-  lastWarningCode: string | null
-  lastWarningParams: ErrorParams | null
-  /** A `SyncReason`, or free text written before v0.3 */
-  lastReason: string | null
   cardCount: number
   recordCount: number
-  nextRunAt: string | null
-  /** Mapped columns that are missing or have an unexpected type, from the last sync; null when not checked */
-  fieldIssues: FieldIssue[] | null
-}
-
-export type NotionDbKey = 'cards' | 'records'
-
-/** A mapped column that could not be read as expected */
-export interface FieldIssue {
-  db: NotionDbKey
-  /** Mapping key, e.g. `expiresAt` */
-  key: string
-  /** Column name SIMerald looked for */
-  column: string
-  problem: 'missing' | 'type'
-  /** Actual Notion property type when `problem` is `type` */
-  actualType?: string
-  /** Notion property types SIMerald can read for this field */
-  expectedTypes: string[]
-  /** True when the field drives the public card wall (validity, status, prices…) */
-  important: boolean
-}
-
-export type MappingPresetChoice = 'zh' | 'en' | 'custom'
-
-export interface DetectedDatabase {
-  id: string
-  title: string
-}
-
-/** One complete template found by auto-detection */
-export interface DetectMatch {
-  preset: 'zh' | 'en'
-  cards: DetectedDatabase
-  records: DetectedDatabase | null
-  accounts: DetectedDatabase | null
-  /** Number of preset columns found in the cards database */
-  matchedColumns: number
-}
-
-export interface NotionSettingsView {
-  tokenConfigured: boolean
-  /** True when the token is set via environment variable and cannot be modified in the UI */
-  tokenFromEnv: boolean
-  cardsDb: string
-  recordsDb: string
-  accountsDb: string
-  preset: MappingPresetChoice
-  /** Custom mapping JSON, used when `preset` is `custom` */
-  mapping: string
+  /** Notes with problems found by the last successful sync */
+  issues: NoteIssue[]
 }
 
 export interface AdminStatus {
   sync: SyncStatus
-  notion: NotionSettingsView
-  syncTime: string
-  timezone: string
-  recoveryCodesLeft: number
-  sessions: number
+  /** Email of the signed-in Cloudflare Access user */
+  email: string | null
+  /** Folder inside the R2 bucket that holds the card notes */
+  cardsFolder: string
 }

@@ -50,9 +50,10 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    // Proxy API requests to the backend server during local development
+    // Proxy API and logo requests to `wrangler dev` (npm run dev:worker) during local development
     proxy: {
-      '/api': 'http://127.0.0.1:25780',
+      '/api': 'http://127.0.0.1:8790',
+      '/logos': 'http://127.0.0.1:8790',
     },
   },
   build: {

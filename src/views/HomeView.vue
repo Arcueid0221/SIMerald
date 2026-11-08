@@ -16,7 +16,6 @@ import { CARD_STYLES, useAppStore } from '@/stores/app'
 import { useCardsStore } from '@/stores/cards'
 import { countryName, keepAliveLabels, sortCards } from '@/utils/cardHelpers'
 import { getContinent } from '@/utils/continentHelper'
-import { notionSetupUrl } from '@/utils/links'
 import { isRegionMatch } from '@/utils/regionHelper'
 
 defineOptions({ name: 'HomeView' })
@@ -144,11 +143,8 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
         <AlertTitle>{{ t('home.demoTitle') }}</AlertTitle>
         <AlertDescription>
           {{ t('home.demoBody') }}<RouterLink v-if="appStore.isLoggedIn" to="/admin" class="text-emerald-600 underline-offset-4 hover:underline">
-            {{ t('home.demoConnect') }}
+            {{ t('home.demoSync') }}
           </RouterLink>
-          <a :href="notionSetupUrl()" target="_blank" rel="noopener noreferrer" class="text-emerald-600 underline-offset-4 hover:underline" :class="appStore.isLoggedIn && 'ml-2'">
-            {{ t('home.demoGuide') }}
-          </a>
         </AlertDescription>
       </Alert>
     </div>

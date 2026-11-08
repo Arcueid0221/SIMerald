@@ -1,8 +1,8 @@
-import type { CardKind, CardStatus, KeepAliveCode, NotionColor, SimCard, SimRecord } from '../shared/types.ts'
-import { KEEP_ALIVE_VALUES, RECORD_TYPES, STATUS_VALUES } from './mapping.ts'
+import type { CardKind, CardStatus, KeepAliveCode, SimCard, SimRecord, TagColor } from '../shared/types.ts'
+import { KEEP_ALIVE_VALUES, RECORD_TYPES, STATUS_VALUES } from './vocab.ts'
 
 /**
- * Demo data shown when Notion is not configured. Uses fictional carriers and numbers
+ * Demo data shown before the first sync. Uses fictional carriers and numbers
  * with dates computed relative to today so the demo always looks active.
  */
 
@@ -16,7 +16,7 @@ interface DemoSpec {
   region: string
   country: [zh: string, en: string]
   kind: CardKind
-  color: NotionColor
+  color: TagColor
   device: DeviceKey | null
   keepAlive: KeepAliveCode[]
   cycleDays: number
@@ -29,7 +29,7 @@ interface DemoSpec {
   services: string[]
 }
 
-/** Labels as the official template of each language would write them */
+/** Labels in each UI language */
 const TEXT = {
   zh: {
     type: { physical: '实体 SIM', embedded: 'eSIM · 直写手机', adapter: 'eSIM · 卡托', virtual: '虚拟号码（仅 App）' },
@@ -96,7 +96,7 @@ function key(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-/** Demo cards in the language of the visitor's UI, as if synced from that language's template */
+/** Demo cards in the language of the visitor's UI */
 export function buildDemoCards(lang: DemoLang = 'zh'): SimCard[] {
   const text = TEXT[lang]
   const i = LANG_INDEX[lang]
@@ -178,7 +178,6 @@ export function buildDemoCards(lang: DemoLang = 'zh'): SimCard[] {
       cancelledAt,
       firstPurchaseAt: key(first),
       totalSpentCNY: Math.round(totalSpent * 100) / 100,
-      urgency: null,
       order: index,
       history,
       number: spec.number,
@@ -186,7 +185,7 @@ export function buildDemoCards(lang: DemoLang = 'zh'): SimCard[] {
       account: 'demo@example.com',
       paymentAccounts: [text.account],
       dataCheck: null,
-      notionUrl: null,
+      source: null,
     }
   })
 }

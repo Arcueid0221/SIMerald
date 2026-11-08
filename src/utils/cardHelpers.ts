@@ -167,7 +167,7 @@ export function joinList(items: string[]): string {
   return items.join(t('common.listSeparator'))
 }
 
-/** Keep-alive actions in the current language; labels that are not template options stay as written in Notion */
+/** Keep-alive actions in the current language; labels outside the known vocabulary stay as written in the note */
 export function keepAliveLabels(card: SimCard): string[] {
   return card.keepAlive.map((label, index) => {
     const code = card.keepAliveCodes?.[index]
@@ -202,7 +202,7 @@ const REGION_NAME_OVERRIDES: Record<AppLocale, Record<string, string>> = {
 
 const regionNames = new Map<AppLocale, Intl.DisplayNames>()
 
-/** Country name in the current language from the flag emoji, falling back to the name written in Notion */
+/** Country name in the current language from the flag emoji, falling back to the name written in the note */
 export function countryName(card: SimCard): string {
   if (!card.region)
     return card.countryName
@@ -310,7 +310,7 @@ export function statusText(status: CardStatus): string {
 export function sortCards(cards: SimCard[], mode: string): SimCard[] {
   const list = [...cards]
   switch (mode) {
-    case 'notion':
+    case 'manual':
       return list.sort((a, b) => a.order - b.order)
     case 'name':
       return list.sort((a, b) => compareText(a.name, b.name))

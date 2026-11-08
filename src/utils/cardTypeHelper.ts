@@ -1,4 +1,4 @@
-import type { CardKind, NotionColor } from '@shared/types'
+import type { CardKind, TagColor } from '@shared/types'
 import { i18n } from '@/i18n'
 
 const KIND_ICONS: Record<CardKind, string> = {
@@ -8,8 +8,8 @@ const KIND_ICONS: Record<CardKind, string> = {
   virtual: 'tabler:cloud',
 }
 
-/** Maps Notion select-option colors to Tailwind text color classes */
-const COLOR_CLASSES: Record<NotionColor, string> = {
+/** Maps card type tag colors to Tailwind text color classes */
+const COLOR_CLASSES: Record<TagColor, string> = {
   default: 'text-slate-500',
   gray: 'text-slate-500',
   brown: 'text-amber-700 dark:text-amber-500',
@@ -30,6 +30,6 @@ export function getKindName(kind: CardKind): string {
   return i18n.global.t(`cardKinds.${kind in KIND_ICONS ? kind : 'physical'}`)
 }
 
-export function getTypeColorClass(color: NotionColor): string {
+export function getTypeColorClass(color: TagColor): string {
   return COLOR_CLASSES[color] ?? COLOR_CLASSES.default
 }

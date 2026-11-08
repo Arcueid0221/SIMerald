@@ -63,7 +63,7 @@ export function translateKey(key: string, params: Record<string, unknown> = {}, 
 
 /**
  * Translates an API or sync error code. A `cause` param holding another code is translated first, so
- * nested failures (e.g. a Notion error inside a sync warning) read naturally. `fallback` is shown for
+ * nested failures (e.g. a cause inside a sync warning) read naturally. `fallback` is shown for
  * unknown codes and for messages stored before codes existed.
  */
 export function translateError(code: string | null | undefined, params: ErrorParams | null | undefined, fallback: string): string {

@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "simerald",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "sim.arcueidblog.top", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Everything else is a static file of the Vue app
+    "run_worker_first": ["/api/*", "/logos/*"]
+  },
+  // Bucket the ESIM Obsidian vault is synced to by Remotely Save
+  "r2_buckets": [{ "binding": "NOTES", "bucket_name": "esim-notes" }],
+  // Snapshot of the last sync, sync status and theme settings.
+  // The id is filled in when the namespace is created (deployment step); local `wrangler dev` does not need it.
+  "kv_namespaces": [{ "binding": "STORE", "id": "00000000000000000000000000000000" }],
+  "vars": {
+    "CARDS_FOLDER": "卡片",
+    "LOGOS_FOLDER": "logos",
+    "TIMEZONE": "Asia/Shanghai",
+    // Filled in after the Access application is created; while empty, nobody can use the admin page
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+  "observability": { "enabled": true },
+  // 8787 (wrangler's default) is often taken by other local tools. `host` keeps request.url on localhost
+  // instead of the production route, so DEV_ADMIN_EMAIL (.dev.vars) can apply
+  "dev": { "port": 8790, "ip": "127.0.0.1", "host": "localhost" }
+}

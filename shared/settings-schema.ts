@@ -26,7 +26,7 @@ export const SETTINGS_SCHEMA: SettingItem[] = [
   { key: 'sitename', type: 'string', default: 'SIMerald' },
   { key: 'defaultLanguage', type: 'select', default: 'auto', options: 'auto,zh-CN,en' },
   { key: 'defaultCardStyle', type: 'select', default: 'namecard', options: 'namecard,dial,bar' },
-  { key: 'defaultSort', type: 'select', default: 'renewal', options: 'renewal,notion,name,country' },
+  { key: 'defaultSort', type: 'select', default: 'renewal', options: 'renewal,manual,name,country' },
 
   { section: 'alert', type: 'title' },
   { key: 'alertEnabled', type: 'switch', default: false },

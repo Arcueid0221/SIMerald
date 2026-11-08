@@ -9,8 +9,8 @@ This document applies to `src/` only. Keep frontend changes aligned with the exi
 - `src/router/index.ts` defines lazy-loaded routes:
   - `/` → `@/views/HomeView.vue` (card wall)
   - `/card/:id` → `@/views/CardDetail.vue` (single card details and renewal history)
-  - `/admin` → `@/views/AdminView.vue` (first-time setup, login with TOTP, settings panel)
-- The router has **no navigation guards**. Access control is enforced on the backend; `AdminView.vue` renders setup, login, or settings panels based on store state.
+  - `/admin` → `@/views/AdminView.vue` (sign-in prompt when there is no Cloudflare Access login; otherwise "Sync notes" and theme settings)
+- The router has **no navigation guards**. Access control is enforced on the backend; `AdminView.vue` shows a sign-in prompt (a full page load of `/admin`, which Access intercepts) or the settings panels based on `appStore.isLoggedIn`.
 
 ## Authoring Conventions
 
@@ -51,7 +51,7 @@ When adding or updating UI:
 
 - `index.ts` creates the `vue-i18n` instance (Composition API, `legacy: false`) and exports `AppLocale` (`'zh-CN' | 'en'`), `setLocale()` (also sets `<html lang>`), `browserLocale()`, `translateKey()` for keys built at runtime, `translateError()` for API / sync error codes, `formatNumber()` and `compareText()` (locale-aware number formatting and sorting).
 - `locales/zh-CN.ts` is the source dictionary and defines `MessageSchema`; `locales/en.ts` is typed against it, so a missing English key fails the type check. Keys used through `t()` are not type-checked against the dictionary, so check new keys by hand.
-- Message syntax: `{name}` interpolates; plural forms are separated by `|` and selected with `t(key, n)` (`{n}` is the count); a literal `@ { } | $` must be written as `{'@'}` etc. `keepAlive`, `recordKinds` and `cycle` reuse the option names of each language's Notion template.
+- Message syntax: `{name}` interpolates; plural forms are separated by `|` and selected with `t(key, n)` (`{n}` is the count); a literal `@ { } | $` must be written as `{'@'}` etc. `keepAlive`, `recordKinds` and `cycle` reuse the labels the card notes use in each language.
 - The active language lives in `useAppStore().locale`: the visitor's choice (`localStorage` key `locale`), else the `defaultLanguage` theme setting, else the browser language. The header language button toggles it. Messages are compiled by vue-i18n's JIT compiler, which works under the `script-src 'self'` CSP.
 - In components use `const { t } = useI18n()`; in plain modules (`@/utils/*`) use `i18n.global.t`. Helpers that return display text (`cardHelpers`, `cardTypeHelper`) translate at call time, so computed values re-run when the language changes.
 
@@ -66,8 +66,8 @@ When adding or updating UI:
 ## Utilities and Composables
 
 - `@/utils/api`: HTTP client wrapper; automatically attaches the `X-SIMerald-Request: 1` CSRF header on state-changing requests, and turns error responses into `ApiError` with `code` / `params` and a message translated from `errors.<code>`.
-- `@/utils/init`: Startup data loading and 10-minute background refresh timer; call `refreshData()` after login, logout, or manual sync. Also reloads demo cards when the UI language changes.
-- `@/utils/cardHelpers`: SIM card computations (days remaining, validity ratio and color tone, initial purchase price, annual keep-alive cost, balance coverage check, and sorting) and localized display of Notion-derived values (`countryName`, `keepAliveLabels`, `cycleText`, `recordKindLabel`, `billingPeriodText`, `joinList`).
+- `@/utils/init`: Startup data loading and 10-minute background refresh timer; call `refreshData()` after a manual sync. Also reloads demo cards when the UI language changes.
+- `@/utils/cardHelpers`: SIM card computations (days remaining, validity ratio and color tone, initial purchase price, annual keep-alive cost, balance coverage check, and sorting) and localized display of note-derived values (`countryName`, `keepAliveLabels`, `cycleText`, `recordKindLabel`, `billingPeriodText`, `joinList`).
 - `@/utils/cardTypeHelper`: Card type icon and label helpers.
 - `@/utils/financeHelper` and `@/composables/useExchangeRates`: Multi-currency conversion, monthly expense, and remaining value calculations.
 - `@/utils/regionHelper`, `@/utils/geoHelper`, `@/utils/tagHelper`: Country flag, geographic coordinate, and tag helpers.

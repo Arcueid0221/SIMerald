@@ -45,7 +45,6 @@ export function toPublicCard(card: SimCard): SimCard {
     cancelledAt: card.cancelledAt,
     firstPurchaseAt: card.firstPurchaseAt,
     totalSpentCNY: card.totalSpentCNY,
-    urgency: card.urgency,
     order: card.order,
     history: card.history.map(publicRecord),
     logo: card.logo ?? null,

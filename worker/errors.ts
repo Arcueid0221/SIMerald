@@ -9,13 +9,11 @@ export class AppError extends Error {
   status: number
   code: string
   params: ErrorParams
-  retryAfter?: number
 
-  constructor(status: number, code: string, message: string, params: ErrorParams = {}, retryAfter?: number) {
+  constructor(status: number, code: string, message: string, params: ErrorParams = {}) {
     super(message)
     this.status = status
     this.code = code
     this.params = params
-    this.retryAfter = retryAfter
   }
 }
