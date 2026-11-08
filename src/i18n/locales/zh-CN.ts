@@ -386,6 +386,10 @@ export default {
           'hide': '隐藏整个头部',
         },
       },
+      headerLinks: {
+        name: '页头链接',
+        help: '页头右上角放切换到其他站的链接。格式：名称=网址，多个用分号隔开，例如 服务器=https://monitor.arcueidblog.top',
+      },
       visitorInfoCardEnabled: {
         name: '访客信息卡片',
         help: '显示访客来源、设备和浏览器信息卡片',

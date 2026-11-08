@@ -380,6 +380,10 @@ const en: MessageSchema = {
           'hide': 'Hide entire header',
         },
       },
+      headerLinks: {
+        name: 'Header links',
+        help: 'Links to other sites in the top-right of the header. Format: label=URL, separated by semicolons, e.g. Servers=https://monitor.example.com',
+      },
       visitorInfoCardEnabled: {
         name: 'Visitor info card',
         help: 'Show a card with visitor location, device, and browser details',

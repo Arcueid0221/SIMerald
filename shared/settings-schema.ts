@@ -39,6 +39,7 @@ export const SETTINGS_SCHEMA: SettingItem[] = [
   { key: 'hideAdminEntryWhenLoggedOut', type: 'switch', default: false },
   { key: 'disablePageAnimation', type: 'switch', default: false },
   { key: 'cancelledLast', type: 'switch', default: true },
+  { key: 'headerLinks', type: 'string', default: '' },
 
   { section: 'icp', type: 'title' },
   { key: 'icpEnabled', type: 'switch', default: false },

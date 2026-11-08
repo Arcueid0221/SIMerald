@@ -74,6 +74,13 @@ const sitename = computed(() => appStore.sitename)
         </h3>
       </div>
       <div class="flex items-center gap-2">
+        <a
+          v-for="link in appStore.headerLinks" :key="link.url" :href="link.url"
+          class="flex items-center gap-1 rounded-md px-2 h-8 text-sm hover:bg-accent transition-colors"
+        >
+          <Icon icon="icon-park-outline:switch" :width="15" :height="15" />
+          {{ link.label }}
+        </a>
         <DataTooltip v-for="button in actionButtons" :key="button.action" :content="button.title" placement="left" content-class="whitespace-nowrap text-[11px] px-2">
           <Button variant="ghost" size="icon-sm" @click="handleButtonClick(button.action)">
             <Icon :icon="button.icon" :width="18" :height="18" />

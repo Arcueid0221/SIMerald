@@ -5,6 +5,7 @@ import { usePreferredDark, useStorageAsync } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { browserLocale, isAppLocale, setLocale } from '@/i18n'
+import { parseHeaderLinks } from '@/utils/headerLinks'
 import { safeUrl } from '@/utils/helper'
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
@@ -125,6 +126,8 @@ const useAppStore = defineStore('app', () => {
     }
     return 'earth'
   })
+
+  const headerLinks = computed(() => parseHeaderLinks(publicSettings.value?.theme_settings?.headerLinks))
 
   const visitorInfoCardEnabled = computed<boolean>(() => {
     const settings = publicSettings.value?.theme_settings
@@ -330,6 +333,7 @@ const useAppStore = defineStore('app', () => {
     alertContent,
     earthViewMode,
     visitorInfoCardEnabled,
+    headerLinks,
     visitorCountryCode,
     hideAdminEntryWhenLoggedOut,
     disablePageAnimation,
