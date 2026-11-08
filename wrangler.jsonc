@@ -15,9 +15,8 @@
   },
   // Bucket the ESIM Obsidian vault is synced to by Remotely Save
   "r2_buckets": [{ "binding": "NOTES", "bucket_name": "esim-notes" }],
-  // Snapshot of the last sync, sync status and theme settings.
-  // The id is filled in when the namespace is created (deployment step); local `wrangler dev` does not need it.
-  "kv_namespaces": [{ "binding": "STORE", "id": "00000000000000000000000000000000" }],
+  // Snapshot of the last sync, sync status and theme settings (namespace "simerald-store")
+  "kv_namespaces": [{ "binding": "STORE", "id": "932a8e6b465a45b88fdd9f6e9df5c985" }],
   "vars": {
     "CARDS_FOLDER": "卡片",
     "LOGOS_FOLDER": "logos",
