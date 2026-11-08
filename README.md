@@ -36,7 +36,23 @@ Obsidian（iCloud 里的 ESIM 库）
 
 ## 笔记格式
 
-每张卡一篇笔记，放在库里的 `卡片/` 文件夹（文件夹名由 `wrangler.jsonc` 的 `CARDS_FOLDER` 决定）。模板在 [`docs/obsidian-template/模板/SIM 卡.md`](docs/obsidian-template/模板/SIM%20卡.md)，总览表在 [`docs/obsidian-template/SIM 卡总览.base`](docs/obsidian-template/SIM%20卡总览.base)。
+每张卡一篇笔记，放在库里的 `卡片/` 文件夹（文件夹名由 `wrangler.jsonc` 的 `CARDS_FOLDER` 决定）。
+
+### 用下拉框填（Templater）
+
+`docs/obsidian-template/` 是放进 ESIM 库的文件，需要库里装 Templater 插件：
+
+| 文件                   | 作用                                                                                                                                                                                                                                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `模板/SIM 卡.md`       | 在 `卡片/` 里新建笔记时自动运行：依次弹出运营商（带 `logos/` 里的 Logo）、国家（带国旗，选了自动带出币种和区号）、类型、保号方式（多选）、续费周期、币种的选择框，再问金额和号码；写好属性和第一行「首次购买/开卡」记录（有效期按周期推算），并把笔记改名为「运营商 后4位」。按 Esc 跳过某一项 |
+| `模板/续费记录.md`     | 在某张卡的笔记里运行「Templater: 插入模板」选它：选记录类型和币种，问日期、金额、汇率，「有效期延至」默认是当前有效期加一个周期；把一行加到表格末尾                                                                                                                                            |
+| `模板/下拉选项.md`     | 上面两个模板的选项列表（国家、类型、保号方式、周期、币种、记录类型、运营商），直接改这篇笔记就能增减                                                                                                                                                                                           |
+| `.obsidian/types.json` | 属性类型：日期类用日期选择器，金额类用数字，列表类用列表                                                                                                                                                                                                                                       |
+| `SIM 卡总览.base`      | Bases 表格，列出所有卡                                                                                                                                                                                                                                                                         |
+
+Templater 设置：模板文件夹 `模板`，打开「Trigger Templater on new file creation」，文件夹模板 `卡片` → `模板/SIM 卡.md`。
+
+### 属性和表格
 
 ```markdown
 ---
@@ -156,7 +172,7 @@ npm run deploy
 - `src/`：Vue 前端（见 [`src/AGENTS.md`](src/AGENTS.md)）
 - `shared/`：前后端共用的类型和主题设置表
 - `public/_headers`：静态页面的安全响应头
-- `docs/obsidian-template/`：放进 ESIM 库的模板笔记和 Bases 总览
+- `docs/obsidian-template/`：放进 ESIM 库的 Templater 模板、下拉选项、属性类型和 Bases 总览
 
 ## 发布记录
 

@@ -23,7 +23,7 @@ Repository guide for `simerald` (Obsidian + Cloudflare Workers adaptation).
 - `worker/settings.ts`: theme settings and the HMAC key for public card IDs (KV keys `theme`, `id-key`)
 - `worker/logos.ts`, `worker/demo.ts`, `worker/vocab.ts` (status / record type / keep-alive vocabularies), `worker/errors.ts`, `worker/env.ts`
 - `src/views/AdminView.vue`, `src/components/admin/SyncSection.vue`, `ThemeSection.vue`: the admin page
-- `docs/obsidian-template/`: template note and Bases view to copy into the vault
+- `docs/obsidian-template/`: files copied into the vault: Templater templates (`模板/SIM 卡.md` new card, `模板/续费记录.md` add a renewal row), the option lists they read (`模板/下拉选项.md`), property types (`.obsidian/types.json`) and the Bases view. Keep them in step with the property and column names `worker/cards.ts` and `worker/obsidian.ts` accept.
 
 ## Commands
 

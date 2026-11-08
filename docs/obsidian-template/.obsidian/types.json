@@ -1,0 +1,12 @@
+{
+  "types": {
+    "续费金额": "number",
+    "余额": "number",
+    "余额更新日期": "date",
+    "停用日期": "date",
+    "首次购买日期": "date",
+    "保号方式": "multitext",
+    "绑定服务": "multitext",
+    "扣款账户": "multitext"
+  }
+}
